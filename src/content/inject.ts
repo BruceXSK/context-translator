@@ -185,6 +185,12 @@ class BlockView implements View {
   private textEl: HTMLElement;
   private errorEl: HTMLElement;
   private readonly originals: Map<number, Element>;
+  // CT-012: animated "Translating…" placeholder shown from start() until the first chunk.
+  // Driven by a timer (not CSS @keyframes) because the block is light-DOM with no shadow
+  // (CT-010): a global <style> would collide with / leak into the host page.
+  private static readonly SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'; // 10-frame braille spinner — zero CSS, ASCII-free
+  private waitTimer: number | null = null;
+  private waitFrame = 0;
   constructor(originals: Map<number, Element>) {
     this.originals = originals;
     this.host = document.createElement('chrome-translator-block');
@@ -198,16 +204,30 @@ class BlockView implements View {
     this.textEl = this.host.querySelector<HTMLElement>('.ct-text')!;
     this.errorEl = this.host.querySelector<HTMLElement>('.ct-error')!;
   }
-  start() { this.textEl.textContent = ''; this.errorEl.hidden = true; }
-  setChunk(full: string) { this.textEl.textContent = stripTags(full); }
+  start() {
+    this.errorEl.hidden = true;
+    this.stopWaiting();
+    this.waitFrame = 0;
+    this.textEl.textContent = 'Translating ' + BlockView.SPINNER[0];
+    this.waitTimer = window.setInterval(() => {
+      this.waitFrame = (this.waitFrame + 1) % BlockView.SPINNER.length; // 10-frame loop
+      this.textEl.textContent = 'Translating ' + BlockView.SPINNER[this.waitFrame];
+    }, 80);
+  }
+  setChunk(full: string) { this.stopWaiting(); this.textEl.textContent = stripTags(full); }
   done(full: string) {
+    this.stopWaiting();
     const html = reconstruct(full, this.originals);
     this.textEl.innerHTML = html || stripTags(full); // fallback to plain text if reconstruction yields nothing
   }
   error(msg: string, _onRetry: () => void) {
+    this.stopWaiting();
     this.textEl.textContent = '';
     this.errorEl.textContent = msg;
     this.errorEl.hidden = false;
+  }
+  private stopWaiting(): void {
+    if (this.waitTimer !== null) { window.clearInterval(this.waitTimer); this.waitTimer = null; }
   }
 }
 
