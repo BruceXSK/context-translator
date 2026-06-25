@@ -9,13 +9,13 @@ export const manifest = defineManifest({
     default_popup: 'src/popup/index.html',
   },
   background: {
-    service_worker: 'src/background/index.ts',
+    service_worker: 'src/background/sw.ts',
     type: 'module',
   },
   content_scripts: [
     {
       matches: ['<all_urls>'],
-      js: ['src/content/index.ts'],
+      js: ['src/content/inject.ts'],
     },
   ],
   permissions: ['contextMenus', 'storage'],
