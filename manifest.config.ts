@@ -8,6 +8,10 @@ export const manifest = defineManifest({
   action: {
     default_popup: 'src/popup/index.html',
   },
+  options_ui: {
+    page: 'src/options/page.html',
+    open_in_tab: true,
+  },
   background: {
     service_worker: 'src/background/sw.ts',
     type: 'module',

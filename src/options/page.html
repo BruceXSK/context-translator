@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chrome Translator · 设置</title>
+    <style>
+      :root{--paper:#fbf8f1;--paper-2:#f3ecdd;--ink:#2b2620;--ink-soft:#6f6557;--accent:#9a6a2f;--rule:#e8ddc7;
+        --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Hoefler Text',Georgia,serif;
+        --sans:'Avenir Next','Avenir','Segoe UI',system-ui,sans-serif;}
+      *{box-sizing:border-box}
+      body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+        min-height:100vh;padding:0 20px 48px;display:flex;flex-direction:column;align-items:center}
+      header{width:100%;max-width:680px;padding:26px 0 16px;border-bottom:1px solid var(--rule);margin-bottom:8px}
+      h1{margin:0;font-family:var(--serif);font-size:1.4rem;font-weight:600}
+      h1::before{content:"";display:inline-block;width:4px;height:18px;background:var(--accent);margin-right:10px;vertical-align:-3px;border-radius:2px}
+      form{width:100%;max-width:680px;display:flex;flex-direction:column;gap:16px;margin-top:8px}
+      label{display:flex;flex-direction:column;gap:5px;font-size:.72rem;letter-spacing:.05em;color:var(--ink-soft);text-transform:uppercase;font-weight:600}
+      input,textarea{font-family:var(--sans);font-size:.92rem;color:var(--ink);padding:9px 11px;border:1px solid var(--rule);border-radius:7px;background:#fff;outline:none}
+      input:focus,textarea:focus{border-color:var(--accent)}
+      textarea{resize:vertical;min-height:160px}
+      .actions{display:flex;align-items:center;gap:14px;margin-top:4px}
+      button{font-family:var(--sans);font-size:.88rem;font-weight:600;color:#fff;background:var(--accent);border:none;border-radius:7px;padding:9px 22px;cursor:pointer}
+      button:hover{filter:brightness(1.06)}
+      #status{font-size:.8rem;color:var(--accent);min-height:1em}
+      .hint{font-size:.74rem;color:var(--ink-soft);text-transform:none;letter-spacing:0;font-weight:400}
+      fieldset{border:none;padding:0;margin:0}
+      legend{font-size:.72rem;letter-spacing:.05em;color:var(--ink-soft);text-transform:uppercase;font-weight:600;margin-bottom:7px}
+      .segmented{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:#fff}
+      .segmented label.seg{position:relative;flex:1 1 auto;display:flex;align-items:center;justify-content:center;padding:9px 26px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--ink);border-right:1px solid var(--rule);transition:background .15s,color .15s;user-select:none}
+      .segmented label.seg:last-child{border-right:none}
+      .segmented label.seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+      .segmented label.seg span{pointer-events:none}
+      .segmented label.seg:hover{background:var(--paper-2)}
+      .segmented label.seg:has(input:checked){background:var(--accent);color:#fff}
+      .segmented label.seg:has(input:checked):hover{filter:brightness(1.06)}
+    </style>
+  </head>
+  <body>
+    <header><h1>Chrome Translator 设置</h1></header>
+    <form id="settings">
+      <label>Base URL<input name="baseUrl" type="url" placeholder="https://api.deepseek.com/v1" /></label>
+      <label>API Key<input name="apiKey" type="password" placeholder="sk-..." /></label>
+      <label>Model<input name="model" placeholder="deepseek-chat" /></label>
+      <fieldset class="trigger">
+        <legend>触发键</legend>
+        <div class="segmented">
+          <label class="seg"><input type="radio" name="triggerKey" value="Alt" checked /><span>ALT</span></label>
+          <label class="seg"><input type="radio" name="triggerKey" value="Shift" /><span>SHIFT</span></label>
+          <label class="seg"><input type="radio" name="triggerKey" value="Control" /><span>CTRL</span></label>
+        </div>
+      </fieldset>
+      <label>System Prompt<textarea name="systemPrompt" rows="10"></textarea></label>
+      <div class="actions"><button type="submit">保存</button><span id="status"></span></div>
+      <p class="hint">目标语言在工具栏弹窗里切换。改动对整个浏览器生效：端点 / key / 模型即时生效；触发键与 system prompt 对新加载的页面生效。</p>
+    </form>
+    <script type="module" src="./page.ts"></script>
+  </body>
+</html>
