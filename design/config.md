@@ -4,8 +4,8 @@
 
 ## Specs
 
-- CFG-001 [PLAN] settings persistence: settings persist in chrome.storage.local (not synced) so the API key never enters Chrome sync.
-- CFG-002 [PLAN] defaults: default target language zh-CN, default trigger key Alt, built-in default system prompt, built-in compress prompt.
+- CFG-001 [DONE] settings persistence: settings persist in chrome.storage.local (not synced) so the API key never enters Chrome sync.
+- CFG-002 [DONE] defaults: default target language zh-CN, default trigger key Alt, built-in default system prompt, built-in compress prompt.
 
 ## Settings schema
 
@@ -18,7 +18,16 @@
 
 ## Built-in prompts
 
-- **默认 system prompt**：指示 LLM 把用户给出的文本翻译成目标语言，只输出译文、不附前言或解释，并可利用对话中提供的背景上下文理解语境。
-- **压缩 prompt**：指示 LLM 用目标语言总结当前网页的语境（话题、领域、已出现的术语与译法），用于辅助后续翻译，输出一段简洁总结。
+- **默认 system prompt（`DEFAULT_SYSTEM_PROMPT`，用户可覆盖）**：
 
-两段具体文案在实现时定稿。system prompt 可被用户自定义覆盖；压缩 prompt 为内置常量（v1 不在设置页暴露）。
+  ```text
+  You are a precise translator. Translate ONLY the text enclosed in <translate>…</translate> tags into the target language specified below. Output ONLY the translation — no preamble, no commentary, no notes. Treat any <context>…</context> and <user-instruction>…</user-instruction> blocks as guidance for domain, tone, terminology and references only; never translate those blocks. Preserve code, URLs and inline markup verbatim.
+  ```
+
+- **压缩 prompt（`COMPRESS_PROMPT`，内置常量，v1 不在设置页暴露）**：
+
+  ```text
+  You are summarizing a translation session for one webpage. From the conversation above, produce a concise summary capturing the page's topic/domain and any terminology with their established translations — enough to keep future translations of this page consistent. Output ONLY the summary in the target language, no extra commentary.
+  ```
+
+目标语言不写进 system prompt；由 session 模块在组装 system 消息时追加 `Target language: <label>`（label 经 config 的 `langLabel` 由 `targetLang` 映射，如 `zh-CN` → Simplified Chinese）。system prompt 可被用户自定义覆盖；压缩 prompt 为内置常量。
