@@ -13,7 +13,7 @@ Global design: purpose, architecture, structure, modules index, and cross-cuttin
 - ARCH-007 [PLAN] compress-to-summary: compressing asks the LLM to summarize the page context; the session becomes system prompt + summary + subsequent messages.
 - ARCH-008 [DONE] all-sites content injection: the content script runs on all URLs so hover translation works on any page.
 - ARCH-009 [DONE] platform baseline: Manifest V3 built with TypeScript, Vite, and @crxjs/vite-plugin.
-- ARCH-010 [DONE] pure-translation output: the LLM returns only the translation with no preamble or explanation.
+- ARCH-010 [DONE] markup-preserving translation output: the LLM returns the translated HTML preserving the inline-element markup (real tags + data-ct-id), with no preamble or explanation.
 - ARCH-011 [DONE] translation direction: source language is auto-detected; target language is configurable with default Simplified Chinese.
 
 ## Purpose

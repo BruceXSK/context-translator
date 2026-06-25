@@ -9,10 +9,12 @@
 - CT-003 [DONE] embedded block translation with toggle: the first trigger fetches and inserts a translation block below the paragraph; later triggers toggle its visibility from cache without re-requesting.
 - CT-004 [DONE] translation cache: completed translations are cached per paragraph so re-showing never re-requests.
 - CT-005 [DONE] selection floating panel: a single reusable, draggable, closable panel near the selection shows the translation; each invocation is a fresh request with no caching.
-- CT-006 [DONE] shadow-DOM UI isolation: injected UI lives in a shadow DOM to isolate it from page styles.
+- CT-006 [DONE] shadow-DOM UI isolation: the selection floating panel lives in a shadow DOM to isolate it from page styles; the embedded hover translation renders in the page DOM (no shadow) so it inherits the page's inline-element styling (links, code) and font.
 - CT-007 [DONE] progressive streaming render: the translation UI updates as tokens arrive.
 - CT-008 [DONE] session ownership: the content script holds the page's session message array and pending-context buffer.
-- CT-009 [DONE] in-place error feedback: failures render in the translation area with a retry control.
+- CT-009 [DONE] in-place error feedback: failures render in the translation area; the selection floating panel provides a retry control, and the embedded hover block retries by re-pressing the trigger key.
+- CT-010 [DONE] source-matched inline translation: the embedded hover translation renders directly after the source text within the same paragraph, with no container box, background, border, or label; its typography (font, size, weight, style, color, line-height, spacing, alignment) inherits the source paragraph's styling via the page's CSS, and it is rendered slightly lighter than the source via a transparency effect, so it reads as a soft continuation of the page rather than an injected widget.
+- CT-011 [DONE] inline-format-preserving translation: the hover translation preserves the source paragraph's inline elements; each inline element is replaced with a placeholder that keeps its real tag plus a data-ct-id attribute (no other attributes — href/class/data-*/style are not sent), and a shallow clone of the original (tag + attributes) is stored by id; the placeholder skeleton (text + real-tag placeholders, no original attributes) is sent to the LLM with a preserve-markup instruction (keep translated text inside each element, move elements as units); the returned HTML is sanitized (dangerous tags/handlers stripped) and each tagged element is swapped back for a clone of its original element (event handlers and dangerous URI schemes stripped) with recursively reconstructed translated children; if an original is missing or the output unsafe, the affected span falls back to plain text.
 
 ## Hover translation flow
 

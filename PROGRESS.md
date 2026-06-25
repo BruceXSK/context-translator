@@ -2,11 +2,12 @@
 
 ## Current State
 
-v1 核心已验证通过：悬停翻译 + 划线翻译在 Chrome 中正常工作。CT-001..009、POP-001、ARCH-001..006/008/010/011 → DONE。剩余：POP-002..005（popup 的手动上下文输入、token 用量显示、压缩/清空按钮——content 侧处理已就绪，只缺 popup UI）+ ARCH-007（压缩，待 POP-004 触发验证）。完成后 v1 全部 spec DONE。
+v1 核心已验证通过：悬停翻译 + 划线翻译在 Chrome 中正常工作。CT-001..011、POP-001、ARCH-001..006/008/010/011 → DONE。剩余：POP-002..005（popup 的手动上下文输入、token 用量显示、压缩/清空按钮——content 侧处理已就绪，只缺 popup UI）+ ARCH-007（压缩，待 POP-004 触发验证）。悬停译文（CT-010/CT-011，Chrome 验证通过 → DONE）：去 Shadow DOM、段内紧贴原文、页面 CSS 字体、略浅透明、无框；内联格式保留用真实标签+`data-ct-id` 占位符（不发 href/class 等）、DOMPurify 消毒、按 id 复用原元素克隆、prompt 禁止丢弃元素（含 the/a/an 合并情况，修 3-链接句首链接丢失）；重试按钮移除、CT-009 收窄到划线悬浮窗。划线悬浮窗不变。typecheck/build 绿。
 
 ## Completed
 
-- (content) src/content/index.ts：悬停 + solo-tap 触发（默认 Alt，可编辑元素内抑制）、段落抽取、译文块插入 + 三态切换 + 按段缓存、划线悬浮面板（单个/可拖拽/可关闭）、Shadow DOM + 构造样式表（编辑式批注美学）、流式渲染、原位错误 + 重试、session 持有、contextMenu/popup/compress 消息处理。CT-001..009 已实现，typecheck/build 绿，Chrome 验证通过 → DONE。
+- (content) src/content/inject.ts：悬停 + solo-tap 触发（默认 Alt，可编辑元素内抑制）、段落抽取、译文块插入 + 三态切换 + 按段缓存、划线悬浮面板（单个/可拖拽/可关闭）、Shadow DOM + 构造样式表、流式渲染、原位错误 + 重试、session 持有、contextMenu/popup/compress 消息处理。CT-001..009 已实现，typecheck/build 绿，Chrome 验证通过 → DONE。
+- (content) src/content/inject.ts：CT-010/CT-011 源文匹配 + 内联格式保留（方案 B'，真实标签占位符）——`extractSkeleton`/`toSkeleton` 遍历段落把每个内联元素替换为**保留真实标签 + `data-ct-id`** 的占位符（嵌套递归，不发 href/class/data-*/style 等原属性），原元素 `cloneNode(false)`（标签+全部属性）按 id 存本地。`reconstruct`/`reconstructNode` 把 LLM 返回经 DOMPurify（`FORBID_TAGS` 剥 script/style/iframe 等危险标签，`on*` 默认剥、`ALLOW_DATA_ATTR`）后，按 `data-ct-id` 取原元素克隆、`sanitizeClone`（剥 `on*`/`javascript:`/`vbscript:`/`file:`/`data:` href、危险 src）、子内容递归换成译文；id 缺失/未知 → 该处回退纯文本。`BlockView` 持 `originals`，`done` 用 `reconstruct`（空回退 stripTags）。`findParagraph` 返回 `{el,skeleton,originals}`，悬停落自身译文时 `closest` 跳过。system prompt 改写：译文留在元素内、整体移动元素、不让标点/连词进出元素；code/kbd/samp/var 原样。块级错误内联、无重试按钮。PanelView（划线悬浮窗）不变。typecheck/build 绿，Chrome 验证通过 → DONE。
 - (popup) src/popup/index.html + main.ts：设置表单（base URL/API key/model/目标语言/触发键/system prompt），读写 chrome.storage.local。POP-001 已实现，typecheck/build 绿，Chrome 验证通过 → DONE。
 - (session) src/session/index.ts：Session 类（turns + pending 缓冲、<context>/<user-instruction>/<translate> 折入、commit、压缩为摘要、用量累计）；SES-001..005 → DONE。运行时往返待 content 接线验证。
 - (background) src/background/index.ts：Port 流式 chat completions（SSE 解析 + stream_options.include_usage）、API key 托管、右键菜单翻译/理解、DeepSeek 感知用量回传；BG-001..004 → DONE。运行时 LLM 往返待 content 接线验证。
@@ -21,3 +22,8 @@ v1 核心已验证通过：悬停翻译 + 划线翻译在 Chrome 中正常工作
 ## Spec Changes
 
 - SES-002 (2026-06-25): `[背景]/[翻译]` markers → `<context>`/`<user-instruction>`/`<translate>` XML tags; pending split into context (from 理解) and instruction (from popup) kinds.
+- CT-010 (2026-06-25): added — source-matched inline translation; the hover translation drops its container box/label/background and renders directly after the source text within the paragraph, inheriting the source paragraph's typography via the page's CSS, rendered slightly lighter than the source via a transparency effect.
+- CT-011 (2026-06-25): added — inline-format-preserving translation via real-tag placeholders + reuse: inline elements keep their real tag + data-ct-id (no other attributes — href/class/data-*/style not sent); returned HTML is sanitized (dangerous tags/handlers stripped) and each tagged element swapped back for a clone of its original (event handlers / dangerous URIs stripped) with recursively reconstructed children; plain-text fallback on loss/unsafe. (Revised from opaque <x> placeholders to real tags after <x> caused the LLM to shuffle/drop placeholders on word-order changes.)
+- CT-006 (2026-06-25): modified — shadow isolation scoped to the selection floating panel; the hover translation now renders in the page DOM (no shadow) to inherit the page's styles.
+- ARCH-010 (2026-06-25): modified — LLM output changed from pure translation to translated HTML preserving the inline-element markup (real tags + data-ct-id).
+- CT-009 (2026-06-25): modified — retry control scoped to the selection floating panel; the embedded hover block no longer shows a retry button and retries by re-pressing the trigger key.
