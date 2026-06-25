@@ -4,15 +4,15 @@
 
 ## Specs
 
-- CT-001 [PLAN] hover trigger: pressing the configurable trigger key (default Alt) over a paragraph requests its translation; the trigger is suppressed inside editable elements.
-- CT-002 [PLAN] paragraph extraction: the translation unit is the text of the block/paragraph containing the cursor.
-- CT-003 [PLAN] embedded block translation with toggle: the first trigger fetches and inserts a translation block below the paragraph; later triggers toggle its visibility from cache without re-requesting.
-- CT-004 [PLAN] translation cache: completed translations are cached per paragraph so re-showing never re-requests.
-- CT-005 [PLAN] selection floating panel: a single reusable, draggable, closable panel near the selection shows the translation; each invocation is a fresh request with no caching.
-- CT-006 [PLAN] shadow-DOM UI isolation: injected UI lives in a shadow DOM to isolate it from page styles.
-- CT-007 [PLAN] progressive streaming render: the translation UI updates as tokens arrive.
-- CT-008 [PLAN] session ownership: the content script holds the page's session message array and pending-context buffer.
-- CT-009 [PLAN] in-place error feedback: failures render in the translation area with a retry control.
+- CT-001 [DONE] hover trigger: pressing the configurable trigger key (default Alt) over a paragraph requests its translation; the trigger is suppressed inside editable elements.
+- CT-002 [DONE] paragraph extraction: the translation unit is the text of the block/paragraph containing the cursor.
+- CT-003 [DONE] embedded block translation with toggle: the first trigger fetches and inserts a translation block below the paragraph; later triggers toggle its visibility from cache without re-requesting.
+- CT-004 [DONE] translation cache: completed translations are cached per paragraph so re-showing never re-requests.
+- CT-005 [DONE] selection floating panel: a single reusable, draggable, closable panel near the selection shows the translation; each invocation is a fresh request with no caching.
+- CT-006 [DONE] shadow-DOM UI isolation: injected UI lives in a shadow DOM to isolate it from page styles.
+- CT-007 [DONE] progressive streaming render: the translation UI updates as tokens arrive.
+- CT-008 [DONE] session ownership: the content script holds the page's session message array and pending-context buffer.
+- CT-009 [DONE] in-place error feedback: failures render in the translation area with a retry control.
 
 ## Hover translation flow
 

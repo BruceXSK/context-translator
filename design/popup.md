@@ -4,7 +4,7 @@
 
 ## Specs
 
-- POP-001 [PLAN] settings form: configure base URL, API key, model, target language (default zh-CN), trigger key (default Alt), and system prompt.
+- POP-001 [DONE] settings form: configure base URL, API key, model, target language (default zh-CN), trigger key (default Alt), and system prompt.
 - POP-002 [PLAN] manual context input: a text input plus submit sends user-typed explanatory content to the active tab's pending-context buffer.
 - POP-003 [PLAN] token usage display: show the active page's cumulative token usage, highlighting cache hit/miss when DeepSeek fields are present.
 - POP-004 [PLAN] compress context action: a button triggers session compression on the active tab.

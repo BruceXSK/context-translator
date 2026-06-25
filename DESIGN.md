@@ -4,17 +4,17 @@ Global design: purpose, architecture, structure, modules index, and cross-cuttin
 
 ## Specs
 
-- ARCH-001 [PLAN] OpenAI-compatible LLM gateway: all LLM requests target a user-configured OpenAI-compatible chat completions endpoint.
-- ARCH-002 [PLAN] per-page session scope: a translation session is bound to a single page load, reset on reload, independent per tab.
-- ARCH-003 [PLAN] separation of state and transport: the service worker performs LLM HTTP calls and holds no session state; the content script owns the session.
-- ARCH-004 [PLAN] streaming output: translations display progressively as tokens arrive and commit to the session only once complete.
-- ARCH-005 [PLAN] context-folding protocol: "理解" and manual explanatory content buffer as pending context folded into the next translation request, preserving user/assistant alternation.
-- ARCH-006 [PLAN] cache-friendly session policy: the session is never auto-truncated; the user manually compresses context based on observed token usage.
+- ARCH-001 [DONE] OpenAI-compatible LLM gateway: all LLM requests target a user-configured OpenAI-compatible chat completions endpoint.
+- ARCH-002 [DONE] per-page session scope: a translation session is bound to a single page load, reset on reload, independent per tab.
+- ARCH-003 [DONE] separation of state and transport: the service worker performs LLM HTTP calls and holds no session state; the content script owns the session.
+- ARCH-004 [DONE] streaming output: translations display progressively as tokens arrive and commit to the session only once complete.
+- ARCH-005 [DONE] context-folding protocol: "理解" and manual explanatory content buffer as pending context folded into the next translation request, preserving user/assistant alternation.
+- ARCH-006 [DONE] cache-friendly session policy: the session is never auto-truncated; the user manually compresses context based on observed token usage.
 - ARCH-007 [PLAN] compress-to-summary: compressing asks the LLM to summarize the page context; the session becomes system prompt + summary + subsequent messages.
-- ARCH-008 [PLAN] all-sites content injection: the content script runs on all URLs so hover translation works on any page.
+- ARCH-008 [DONE] all-sites content injection: the content script runs on all URLs so hover translation works on any page.
 - ARCH-009 [DONE] platform baseline: Manifest V3 built with TypeScript, Vite, and @crxjs/vite-plugin.
-- ARCH-010 [PLAN] pure-translation output: the LLM returns only the translation with no preamble or explanation.
-- ARCH-011 [PLAN] translation direction: source language is auto-detected; target language is configurable with default Simplified Chinese.
+- ARCH-010 [DONE] pure-translation output: the LLM returns only the translation with no preamble or explanation.
+- ARCH-011 [DONE] translation direction: source language is auto-detected; target language is configurable with default Simplified Chinese.
 
 ## Purpose
 
@@ -67,3 +67,7 @@ chrome-translator/
 | session | SES | [design/session.md](./design/session.md) |
 | popup | POP | [design/popup.md](./design/popup.md) |
 | config | CFG | [design/config.md](./design/config.md) |
+
+## troubleshooting
+
+- **入口 basename 冲突（2026-06-25，已解决）：** background 与 content 入口必须用不同 basename。两者都叫 `index.ts` 时，Vite 产出两个 `index.ts-<hash>.js` chunk，CRXJS 把 `service-worker-loader.js` 错连到 content chunk——SW 跑了 content 的 `main()` → `document is not defined`（in promise）→ `onConnect` 未注册 → content 的 Port 一连即断（「与服务端的连接中断」）。改为 `src/background/sw.ts` 与 `src/content/inject.ts` 后修复。教训：扩展各入口文件 basename 必须唯一。
