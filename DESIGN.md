@@ -12,7 +12,7 @@ Global design: purpose, architecture, structure, modules index, and cross-cuttin
 - ARCH-006 [PLAN] cache-friendly session policy: the session is never auto-truncated; the user manually compresses context based on observed token usage.
 - ARCH-007 [PLAN] compress-to-summary: compressing asks the LLM to summarize the page context; the session becomes system prompt + summary + subsequent messages.
 - ARCH-008 [PLAN] all-sites content injection: the content script runs on all URLs so hover translation works on any page.
-- ARCH-009 [PLAN] platform baseline: Manifest V3 built with TypeScript, Vite, and @crxjs/vite-plugin.
+- ARCH-009 [DONE] platform baseline: Manifest V3 built with TypeScript, Vite, and @crxjs/vite-plugin.
 - ARCH-010 [PLAN] pure-translation output: the LLM returns only the translation with no preamble or explanation.
 - ARCH-011 [PLAN] translation direction: source language is auto-detected; target language is configurable with default Simplified Chinese.
 
