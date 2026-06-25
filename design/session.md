@@ -4,11 +4,11 @@
 
 ## Specs
 
-- SES-001 [PLAN] session message model: the session is [system, ...committed user/assistant turns] with pending context buffered separately.
-- SES-002 [PLAN] context folding: pending context has two kinds — context (from 理解) and instruction (user-typed via popup); a translation request assembles the user message as `<context>…</context>` and `<user-instruction>…</user-instruction>` blocks (omitting empties) followed by `<translate>{text}</translate>`, then clears pending.
-- SES-003 [PLAN] commit response: the completed assistant response is appended as a committed turn.
-- SES-004 [PLAN] compress: a preset prompt asks the LLM to summarize the page context; the summary (assistant) replaces committed history while the system prompt and pending context are preserved.
-- SES-005 [PLAN] token usage tracking: usage is accumulated per response (prompt/completion tokens, plus DeepSeek cache hit/miss when present) and exposed for display.
+- SES-001 [DONE] session message model: the session is [system, ...committed user/assistant turns] with pending context buffered separately.
+- SES-002 [DONE] context folding: pending context has two kinds — context (from 理解) and instruction (user-typed via popup); a translation request assembles the user message as `<context>…</context>` and `<user-instruction>…</user-instruction>` blocks (omitting empties) followed by `<translate>{text}</translate>`, then clears pending.
+- SES-003 [DONE] commit response: the completed assistant response is appended as a committed turn.
+- SES-004 [DONE] compress: a preset prompt asks the LLM to summarize the page context; the summary (assistant) replaces committed history while the system prompt and pending context are preserved.
+- SES-005 [DONE] token usage tracking: usage is accumulated per response (prompt/completion tokens, plus DeepSeek cache hit/miss when present) and exposed for display.
 
 ## Message shape
 

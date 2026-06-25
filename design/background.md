@@ -4,10 +4,10 @@
 
 ## Specs
 
-- BG-001 [PLAN] streaming LLM call: the service worker issues a chat completions request with streaming and forwards tokens as they arrive.
-- BG-002 [PLAN] API key custody: only the service worker reads the API key; it is never exposed to the content script or popup.
-- BG-003 [PLAN] selection context menu: the right-click menu offers "翻译" and "理解" on text selections.
-- BG-004 [PLAN] usage return: the service worker returns token usage from each completion, including DeepSeek cache-hit/miss fields when present.
+- BG-001 [DONE] streaming LLM call: the service worker issues a chat completions request with streaming and forwards tokens as they arrive.
+- BG-002 [DONE] API key custody: only the service worker reads the API key; it is never exposed to the content script or popup.
+- BG-003 [DONE] selection context menu: the right-click menu offers "翻译" and "理解" on text selections.
+- BG-004 [DONE] usage return: the service worker returns token usage from each completion, including DeepSeek cache-hit/miss fields when present.
 
 ## Responsibilities
 
