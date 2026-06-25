@@ -321,6 +321,18 @@ function findParagraph(el: Element | null): ParaHit | null {
     const direct = BLOCK_TAGS.has(node.tagName);
     const display = direct ? 'block' : getComputedStyle(node).display;
     if (direct || display === 'block' || display === 'list-item' || display === 'table-cell' || display === 'flow-root') {
+      // CT-014: if this block already contains a translation (e.g. after a -webkit-line-clamp
+      // container expanded and shifted layout, or a -webkit-box ancestor wasn't matched as a
+      // block and we climbed past the real paragraph), re-target that translation's paragraph
+      // so we toggle it instead of creating a duplicate block.
+      const existing = node.querySelector('context-translator-block');
+      if (existing) {
+        const parent = existing.parentElement;
+        if (parent && parent !== document.body && parent !== document.documentElement) {
+          const { skeleton, originals } = extractSkeleton(parent);
+          if (skeleton) return { el: parent, skeleton, originals };
+        }
+      }
       const { skeleton, originals } = extractSkeleton(node);
       if (skeleton) return { el: node, skeleton, originals };
     }
