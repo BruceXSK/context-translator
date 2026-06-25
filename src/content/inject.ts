@@ -98,7 +98,7 @@ function stripTags(s: string): string {
  *  nested elements), storing a shallow clone (tag + attributes) of each original by id. */
 function extractSkeleton(root: Element): { skeleton: string; originals: Map<number, Element> } {
   const clone = root.cloneNode(true) as Element;
-  clone.querySelectorAll('chrome-translator-block, .notranslate').forEach((n) => n.remove());
+  clone.querySelectorAll('context-translator-block, .notranslate').forEach((n) => n.remove());
   const originals = new Map<number, Element>();
   const counter = { n: 0 };
   const frag = document.createDocumentFragment();
@@ -193,7 +193,7 @@ class BlockView implements View {
   private waitFrame = 0;
   constructor(originals: Map<number, Element>) {
     this.originals = originals;
-    this.host = document.createElement('chrome-translator-block');
+    this.host = document.createElement('context-translator-block');
     // No shadow DOM: the translation renders as light-DOM children so the page's own CSS
     // styles its inline elements (links, code) and supplies the font (CT-010/CT-011).
     // Layout is pinned via inline styles; the translation text is dimmed via opacity.
@@ -239,7 +239,7 @@ class PanelView implements View {
   private retryBtn: HTMLElement;
   private head: HTMLElement;
   constructor() {
-    this.host = document.createElement('chrome-translator-panel');
+    this.host = document.createElement('context-translator-panel');
     this.host.style.cssText = 'all:initial;display:block;position:fixed;z-index:2147483647;box-sizing:border-box';
     this.host.style.display = 'none';
     const root = shadowOf(this.host);
@@ -316,7 +316,7 @@ function findParagraph(el: Element | null): ParaHit | null {
   let node: Element | null = el;
   while (node && node !== document.body && node !== document.documentElement) {
     // Skip our own injected translation so hovering the translation finds the paragraph.
-    const own = node.closest('chrome-translator-block');
+    const own = node.closest('context-translator-block');
     if (own) { node = own.parentElement; continue; }
     const direct = BLOCK_TAGS.has(node.tagName);
     const display = direct ? 'block' : getComputedStyle(node).display;

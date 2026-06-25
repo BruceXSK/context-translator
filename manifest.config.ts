@@ -2,7 +2,7 @@ import { defineManifest } from '@crxjs/vite-plugin';
 
 export const manifest = defineManifest({
   manifest_version: 3,
-  name: 'Chrome Translator',
+  name: 'Context Translator',
   version: '0.1.0',
   description: 'AI-powered hover/selection translation with a per-page context session.',
   action: {

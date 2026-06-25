@@ -36,7 +36,7 @@ MV3 三层加一个配置模块：
 ## Project Structure
 
 ```
-chrome-translator/
+context-translator/
 ├── DESIGN.md
 ├── PROGRESS.md
 ├── design/
