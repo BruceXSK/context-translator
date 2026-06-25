@@ -350,6 +350,10 @@ async function main(): Promise<void> {
     view: BlockView;
     translation: string;
     status: 'loading' | 'shown' | 'hidden';
+    // CT-013: nearest ancestor with -webkit-line-clamp that would clip the translation block,
+    // plus its original inline value so we can restore it (re-set, or remove to re-enable a class rule).
+    clampEl: HTMLElement | null;
+    clampOrigInline: string;
   }
   const paraState = new WeakMap<Element, ParaState>();
 
@@ -390,21 +394,52 @@ async function main(): Promise<void> {
     toggleHover(hit.el, hit.skeleton, hit.originals);
   }
 
+  // CT-013: find the nearest ancestor (including el) whose -webkit-line-clamp would clip the
+  // translation block. Google search snippets (.VwiC3b) clamp to N lines; without this the
+  // translation renders in the DOM but is visually clipped ("translates but doesn't show").
+  function findClamp(el: Element): HTMLElement | null {
+    let n: Element | null = el;
+    while (n && n !== document.body && n !== document.documentElement) {
+      if (n instanceof HTMLElement) {
+        const clamp = getComputedStyle(n).getPropertyValue('-webkit-line-clamp');
+        if (clamp && clamp !== 'none') return n;
+      }
+      n = n.parentElement;
+    }
+    return null;
+  }
+  // Open: set the clamp ancestor's line-clamp to none so the translation shows. Close: restore the
+  // recorded original — re-set it if the clamp came from an inline style, or remove the override so a
+  // class rule re-applies. (removeProperty alone would drop an original inline value like "2".)
+  function setClamp(st: ParaState, open: boolean): void {
+    if (!st.clampEl) return;
+    if (open) st.clampEl.style.setProperty('-webkit-line-clamp', 'none');
+    else if (st.clampOrigInline === '') st.clampEl.style.removeProperty('-webkit-line-clamp');
+    else st.clampEl.style.setProperty('-webkit-line-clamp', st.clampOrigInline);
+  }
   function toggleHover(el: Element, skeleton: string, originals: Map<number, Element>): void {
     let st = paraState.get(el);
     if (!st) {
-      st = { view: new BlockView(originals), translation: '', status: 'hidden' };
+      const clampEl = findClamp(el);
+      st = {
+        view: new BlockView(originals),
+        translation: '',
+        status: 'hidden',
+        clampEl,
+        clampOrigInline: clampEl ? clampEl.style.getPropertyValue('-webkit-line-clamp') : '',
+      };
       paraState.set(el, st);
       el.appendChild(st.view.host);
     }
-    if (st.status === 'shown') { st.view.host.style.display = 'none'; st.status = 'hidden'; return; }
-    if (st.status === 'hidden' && st.translation) { st.view.host.style.display = 'block'; st.status = 'shown'; return; }
+    if (st.status === 'shown') { setClamp(st, false); st.view.host.style.display = 'none'; st.status = 'hidden'; return; }
+    if (st.status === 'hidden' && st.translation) { setClamp(st, true); st.view.host.style.display = 'block'; st.status = 'shown'; return; }
     fetchHover(el, skeleton, st);
   }
 
   function fetchHover(el: Element, skeleton: string, st: ParaState): void {
     st.status = 'loading';
     st.view.host.style.display = 'block';
+    setClamp(st, true);
     st.view.start();
     stream('translate', session.buildTranslateRequest(skeleton), {
       onChunk: (full) => st.view.setChunk(full),
