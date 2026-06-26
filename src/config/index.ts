@@ -49,7 +49,7 @@ export const DEFAULTS: Settings = {
   baseUrl: '',
   apiKey: '',
   model: '',
-  thinking: true,
+  thinking: false,
   effort: 'low',
   targetLang: 'zh-CN',
   triggerKey: 'Alt',

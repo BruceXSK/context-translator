@@ -94,6 +94,6 @@ DeepSeek beta 功能：`base_url` 切 `/beta`，末条消息 `role:assistant` + 
 
 - **友好错误提示**：`sw.ts` 对 401（key 错误）/ 402（余额不足）给中文友好提示，其余仍走 `HTTP <status>: <body>`。
 - **自动重试**：429 / 500 / 503 指数退避重试 1~2 次（文档未要求，属可选）。
-- **thinking UI 反馈与计费提示**：thinking 现已可配且默认开启，但流式解析仍只读 `delta.content`——思维链阶段（`delta.reasoning_content`）braille spinner 会一直转到译文首字，用户可能以为卡住。可选增强：(a) 解析 `delta.reasoning_content` 并在 UI 显示"思考中"（区别于 `Translating`），(b) 实测 `completion_tokens` 是否已含 reasoning 以免漏统/重统，(c) 设置页提示思维链按输出价计费。
+- **thinking UI 反馈与计费提示**：thinking 现已可配（默认关闭，开启时设置页弹通知提示翻译可能变慢），但流式解析仍只读 `delta.content`——思维链阶段（`delta.reasoning_content`）braille spinner 会一直转到译文首字，用户可能以为卡住。可选增强：(a) 解析 `delta.reasoning_content` 并在 UI 显示"思考中"（区别于 `Translating`），(b) 实测 `completion_tokens` 是否已含 reasoning 以免漏统/重统。
 - **thinking 下 max_tokens 兜底**：思维链 token 计入输出预算，可能耗尽模型默认 max_tokens 导致译文为空。当前不设 max_tokens（保持与非思考模式一致），作为已知注意点；实测遇到译文为空可考虑设较大 max_tokens。
 - **usage 展示避免双重计数**（POP-003 实现注意）：OpenAI 兼容惯例下 `prompt_tokens` 是总输入，`prompt_cache_hit_tokens + prompt_cache_miss_tokens` 是其拆分；展示应为"输入 X（其中 Y 命中缓存）"，勿将三者相加。thinking 下 `completion_tokens` 的 reasoning 归属需实测确认。

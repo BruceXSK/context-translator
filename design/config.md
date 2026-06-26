@@ -6,14 +6,14 @@
 
 - CFG-001 [DONE] settings persistence: settings persist in chrome.storage.local (not synced) so the API key never enters Chrome sync.
 - CFG-002 [DONE] defaults: default target language zh-CN, default trigger key Alt, built-in default system prompt, built-in compress prompt.
-- CFG-003 [DONE] thinking + effort settings: Settings carry a thinking toggle (boolean, default on) and an effort level (low/medium/high/max, default low), persisted in chrome.storage.local alongside the rest.
+- CFG-003 [DONE] thinking + effort settings: Settings carry a thinking toggle (boolean, default off) and an effort level (low/medium/high/max, default low), persisted in chrome.storage.local alongside the rest.
 
 ## Settings schema
 
 - `baseUrl`: string — OpenAI 兼容端点，如 `https://api.deepseek.com`。
 - `apiKey`: string — 仅 background 读取。
 - `model`: string — 如 `deepseek-v4-flash`（或 `deepseek-v4-pro`）。
-- `thinking`: boolean — DeepSeek 思考模式开关，默认开。
+- `thinking`: boolean — DeepSeek 思考模式开关，默认关；开启时设置页弹出提示。
 - `effort`: string — `low`/`medium`/`high`/`max`，默认 `low`；仅在 thinking 开时随请求发出。DeepSeek 仅 high/max 生效（low/medium 映射 high），全范围保留以兼容其他后端。
 - `targetLang`: string — 默认 `zh-CN`。
 - `triggerKey`: string — 默认 `Alt`。

@@ -34,8 +34,27 @@ function syncEffortDisabled(): void {
   if (effortFieldset) effortFieldset.disabled = !thinkingBox.checked;
 }
 
-// Toggle effort availability as the thinking switch changes.
-field('thinking')?.addEventListener('change', syncEffortDisabled);
+// Toggle effort availability as the thinking switch changes; warn when thinking is turned on.
+field('thinking')?.addEventListener('change', () => {
+  syncEffortDisabled();
+  if ((field('thinking') as HTMLInputElement).checked) showThinkingNotice();
+});
+
+/** Show the thinking-mode notice toast (auto-hides after 8s, or via the close button). */
+let toastTimer: number | null = null;
+function showThinkingNotice(): void {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.hidden = false;
+  if (toastTimer !== null) window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => { toast.hidden = true; toastTimer = null; }, 8000);
+}
+
+document.querySelector('#toast .close')?.addEventListener('click', () => {
+  const toast = document.getElementById('toast');
+  if (toast) toast.hidden = true;
+  if (toastTimer !== null) { window.clearTimeout(toastTimer); toastTimer = null; }
+});
 
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();

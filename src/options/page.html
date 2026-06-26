@@ -46,6 +46,13 @@
       fieldset.effort[disabled] .seg input{cursor:not-allowed}
       fieldset.effort[disabled] .seg:has(input:checked){background:var(--rule);color:var(--ink-soft)}
       fieldset.effort[disabled] .seg:has(input:checked):hover{background:var(--rule);filter:none}
+      .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);max-width:540px;width:calc(100% - 40px);background:#fff;border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:8px;padding:14px 16px;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:.86rem;color:var(--ink);line-height:1.55;z-index:50;display:flex;gap:12px;align-items:flex-start}
+      .toast[hidden]{display:none}
+      .toast .toast-body{flex:1}
+      .toast .toast-title{font-weight:600;color:var(--accent);margin-bottom:4px;font-size:.9rem}
+      .toast .toast-text{color:var(--ink-soft);text-transform:none;letter-spacing:0;font-weight:400}
+      .toast button.close{flex:0 0 auto;background:none;border:none;color:var(--ink-soft);font-size:1rem;line-height:1;cursor:pointer;padding:2px 4px;border-radius:4px}
+      .toast button.close:hover{color:var(--ink);background:var(--paper-2)}
     </style>
   </head>
   <body>
@@ -64,9 +71,9 @@
       </fieldset>
       <fieldset class="thinking">
         <legend>思考模式</legend>
-        <label class="switch"><input type="checkbox" name="thinking" checked /><span class="track"></span></label>
+        <label class="switch"><input type="checkbox" name="thinking" /><span class="track"></span></label>
       </fieldset>
-      <fieldset class="effort">
+      <fieldset class="effort" disabled>
         <legend>思考强度</legend>
         <div class="segmented">
           <label class="seg"><input type="radio" name="effort" value="low" checked /><span>LOW</span></label>
@@ -79,6 +86,13 @@
       <div class="actions"><button type="submit">保存</button><span id="status"></span></div>
       <p class="hint">目标语言在工具栏弹窗里切换。改动对整个浏览器生效：端点 / key / 模型即时生效；触发键与 system prompt 对新加载的页面生效。</p>
     </form>
+    <div id="toast" class="toast" hidden>
+      <div class="toast-body">
+        <div class="toast-title">思考模式已开启</div>
+        <div class="toast-text">模型会先内部推理再翻译，因此等待首字期间会较长时间停留在「Translating…」——这是它在思考，属正常现象，并非卡住。思考会额外消耗 token（按输出计费）并让译文更慢到来。若偏好快速响应，推荐保持关闭。</div>
+      </div>
+      <button type="button" class="close" aria-label="关闭">✕</button>
+    </div>
     <script type="module" src="./page.ts"></script>
   </body>
 </html>
