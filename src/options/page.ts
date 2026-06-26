@@ -1,4 +1,4 @@
-// Options page (POP-006): base URL / API key / model / trigger key / system prompt.
+// Options page (POP-006): base URL / API key / model / trigger key / system prompt / thinking + effort.
 // Reads/writes chrome.storage.local via the config module (shared schema with the popup).
 // Saves a partial patch so the popup-owned targetLang is left untouched.
 import { DEFAULT_SYSTEM_PROMPT, loadSettings, saveSettings, type Settings } from '../config';
@@ -19,16 +19,34 @@ async function populate(): Promise<void> {
   // value is stored, so the content-script key matcher (e.key) always has a valid choice.
   const triggerRadios = form!.elements.namedItem('triggerKey') as RadioNodeList;
   triggerRadios.value = ['Alt', 'Shift', 'Control'].includes(s.triggerKey) ? s.triggerKey : 'Alt';
+  // Thinking toggle + effort single-select (DS-005). Effort is greyed/disabled when thinking is off.
+  (field('thinking') as HTMLInputElement).checked = s.thinking;
+  const effortRadios = form!.elements.namedItem('effort') as RadioNodeList;
+  effortRadios.value = ['low', 'medium', 'high', 'max'].includes(s.effort) ? s.effort : 'low';
+  syncEffortDisabled();
   (field('systemPrompt') as HTMLTextAreaElement).value = s.systemPrompt;
 }
+
+/** Disable the effort fieldset (greyed) when thinking is off; enable when on. */
+function syncEffortDisabled(): void {
+  const thinkingBox = field('thinking') as HTMLInputElement;
+  const effortFieldset = document.querySelector('fieldset.effort') as HTMLFieldSetElement | null;
+  if (effortFieldset) effortFieldset.disabled = !thinkingBox.checked;
+}
+
+// Toggle effort availability as the thinking switch changes.
+field('thinking')?.addEventListener('change', syncEffortDisabled);
 
 form?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(form);
-  const patch: Pick<Settings, 'baseUrl' | 'apiKey' | 'model' | 'triggerKey' | 'systemPrompt'> = {
+  const effortVal = String(fd.get('effort') ?? 'low');
+  const patch: Pick<Settings, 'baseUrl' | 'apiKey' | 'model' | 'thinking' | 'effort' | 'triggerKey' | 'systemPrompt'> = {
     baseUrl: String(fd.get('baseUrl') ?? '').trim(),
     apiKey: String(fd.get('apiKey') ?? ''),
     model: String(fd.get('model') ?? '').trim(),
+    thinking: fd.get('thinking') === 'on',
+    effort: ['low', 'medium', 'high', 'max'].includes(effortVal) ? effortVal : 'low',
     triggerKey: String(fd.get('triggerKey') ?? 'Alt') || 'Alt',
     systemPrompt: String(fd.get('systemPrompt') ?? '').trim() || DEFAULT_SYSTEM_PROMPT,
   };

@@ -15,6 +15,12 @@ export interface Settings {
   apiKey: string;
   /** Model id, e.g. "deepseek-v4-flash" (or "deepseek-v4-pro"). */
   model: string;
+  /** Thinking mode toggle (DeepSeek top-level `thinking` field). Default on. */
+  thinking: boolean;
+  /** Reasoning effort: "low" | "medium" | "high" | "max". Sent only when thinking is on.
+   *  DeepSeek honors high/max (low/medium map to high); the full range is exposed for
+   *  backend portability. Default "low". */
+  effort: string;
   /** Target language code, e.g. "zh-CN". */
   targetLang: string;
   /** Hover-trigger key, e.g. "Alt". */
@@ -43,6 +49,8 @@ export const DEFAULTS: Settings = {
   baseUrl: '',
   apiKey: '',
   model: '',
+  thinking: true,
+  effort: 'low',
   targetLang: 'zh-CN',
   triggerKey: 'Alt',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,

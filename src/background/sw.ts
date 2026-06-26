@@ -48,6 +48,8 @@ async function streamCompletion(port: chrome.runtime.Port, msg: StreamRequestMes
   let usage: Usage = { promptTokens: 0, completionTokens: 0 };
 
   try {
+    // thinking is always sent: DeepSeek defaults to enabled when the field is omitted, so
+    // disabling requires an explicit {type:"disabled"}. reasoning_effort applies only when on.
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
@@ -56,6 +58,8 @@ async function streamCompletion(port: chrome.runtime.Port, msg: StreamRequestMes
         messages: msg.messages,
         stream: true,
         stream_options: { include_usage: true },
+        thinking: { type: settings.thinking ? 'enabled' : 'disabled' },
+        ...(settings.thinking ? { reasoning_effort: settings.effort } : {}),
       }),
     });
     if (!res.ok || !res.body) {

@@ -8,13 +8,14 @@ DeepSeek 作为参考后端的特调知识与兼容性注意。插件对所有 L
 - DS-002 [DONE] no reasoning_content roundtrip: multi-round history carries only the assistant's final content, never its reasoning_content, so thinking-mode chains neither enter the prefix nor break cache hits, matching DeepSeek thinking-mode guidance for tool-free turns.
 - DS-003 [DONE] current model-name examples: examples and placeholders use deepseek-v4-flash (or deepseek-v4-pro), not deepseek-chat / deepseek-reasoner, which are deprecated 2026/07/24.
 - DS-004 [DONE] canonical base-url example: the example base URL is the canonical https://api.deepseek.com (no /v1); URL joining still tolerates a user-supplied /v1.
+- DS-005 [DONE] configurable thinking/effort: DeepSeek thinking mode (top-level `thinking` field) and reasoning_effort are user-configurable from the options page; effort offers the full Low/Medium/High/Max range for backend portability though DeepSeek only honors High/Max (low/medium map to high). The `thinking` field is always sent — DeepSeek defaults to enabled when it is omitted, so disabling requires an explicit `{type:"disabled"}`.
 
 ## Compatibility stance
 
 特调分两类，边界如下：
 
 - **通用最佳实践**（对任何 OpenAI 兼容后端都成立，DeepSeek 之外也受益）：system 消息前置且页面内稳定、committed 轮次顺序追加、变化内容置于请求末尾、不自动截断历史、多轮不回传 reasoning_content、流式跳过 SSE keep-alive 注释行。
-- **DeepSeek 专属**（仅 DeepSeek 端点生效）：`usage.prompt_cache_hit_tokens` / `prompt_cache_miss_tokens` 缓存字段、`thinking` 顶层字段、prefix completion 的 `/beta` 端点。代码对缺失字段容错——`normalizeUsage` 仅在字段存在时捕获，不带 `thinking` 字段时走默认模式，故其他后端不受影响。
+- **DeepSeek 专属**（仅 DeepSeek 端点生效）：`usage.prompt_cache_hit_tokens` / `prompt_cache_miss_tokens` 缓存字段、`thinking` 顶层字段、`reasoning_effort`、prefix completion 的 `/beta` 端点。读侧对缺失字段容错——`normalizeUsage` 仅在字段存在时捕获。写侧（请求体）始终带 `thinking`（enabled/disabled），这是 DeepSeek 特调：其他 OpenAI 兼容后端通常忽略未知字段，但严格后端可能对 `thinking` / `reasoning_effort` 返回 422；这是"针对 DeepSeek 特调"的取舍。
 
 ## Reference
 
@@ -59,7 +60,7 @@ DeepSeek 作为参考后端的特调知识与兼容性注意。插件对所有 L
 
 ### Thinking mode
 
-- 开启：HTTP 请求体顶层 `thinking: { type: "enabled" }`（curl/Node），Python SDK 用 `extra_body`。`reasoning_effort` 取 `high` / `max`（普通默认 `high`）。
+- 开关：HTTP 请求体顶层 `thinking: { type: "enabled" | "disabled" }`（curl/Node），Python SDK 用 `extra_body`。**不发该字段时服务端默认 enabled**，故关闭须显式 `{type:"disabled"}`。`reasoning_effort` 取 `low`/`medium`/`high`/`max`（DeepSeek 实际仅 high/max 生效，low/medium 映射 high；普通默认 high）。
 - 流式：思维链走 `delta.reasoning_content`，最终回答走 `delta.content`，分块返回。
 - 思考模式下 `temperature` / `top_p` / `presence_penalty` / `frequency_penalty` 被静默忽略。
 - 多轮回传：无 tool calls 时历史可省略 `reasoning_content`；有 tool calls 必须完整回传，否则 400。
@@ -93,5 +94,6 @@ DeepSeek beta 功能：`base_url` 切 `/beta`，末条消息 `role:assistant` + 
 
 - **友好错误提示**：`sw.ts` 对 401（key 错误）/ 402（余额不足）给中文友好提示，其余仍走 `HTTP <status>: <body>`。
 - **自动重试**：429 / 500 / 503 指数退避重试 1~2 次（文档未要求，属可选）。
-- **thinking 模式适配**：若启用 thinking，需 (a) 流式解析识别 `delta.reasoning_content` 并在 UI 显示"思考中"（区别于 `Translating`），(b) 实测 `completion_tokens` 是否已含 reasoning 以免漏统/重统，(c) 设置页提示思维链按输出价计费。当前有意不启用 thinking，默认非思考模式。
+- **thinking UI 反馈与计费提示**：thinking 现已可配且默认开启，但流式解析仍只读 `delta.content`——思维链阶段（`delta.reasoning_content`）braille spinner 会一直转到译文首字，用户可能以为卡住。可选增强：(a) 解析 `delta.reasoning_content` 并在 UI 显示"思考中"（区别于 `Translating`），(b) 实测 `completion_tokens` 是否已含 reasoning 以免漏统/重统，(c) 设置页提示思维链按输出价计费。
+- **thinking 下 max_tokens 兜底**：思维链 token 计入输出预算，可能耗尽模型默认 max_tokens 导致译文为空。当前不设 max_tokens（保持与非思考模式一致），作为已知注意点；实测遇到译文为空可考虑设较大 max_tokens。
 - **usage 展示避免双重计数**（POP-003 实现注意）：OpenAI 兼容惯例下 `prompt_tokens` 是总输入，`prompt_cache_hit_tokens + prompt_cache_miss_tokens` 是其拆分；展示应为"输入 X（其中 Y 命中缓存）"，勿将三者相加。thinking 下 `completion_tokens` 的 reasoning 归属需实测确认。
