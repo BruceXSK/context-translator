@@ -48,9 +48,9 @@ export const COMPRESS_PROMPT = `You are summarizing a translation session for on
 
 /** Default settings, applied for any field that has never been set. */
 export const DEFAULTS: Settings = {
-  baseUrl: '',
+  baseUrl: 'https://api.deepseek.com',
   apiKey: '',
-  model: '',
+  model: 'deepseek-v4-flash',
   thinking: false,
   effort: 'low',
   targetLang: 'zh-CN',
@@ -77,20 +77,30 @@ export function langLabel(code: string): string {
   return LANG_LABELS[code] ?? code;
 }
 
+/** Fall empty base URL / model back to the DeepSeek defaults, so clearing the field and
+ *  saving still resolves to the default rather than breaking requests. The API key is
+ *  intentionally not defaulted — it must be filled by the user. */
+function withDefaults(s: Settings): Settings {
+  return { ...s, baseUrl: s.baseUrl || DEFAULTS.baseUrl, model: s.model || DEFAULTS.model };
+}
+
 /**
  * Load settings from chrome.storage.local, merged over DEFAULTS so every field always
- * has a value. Uses chrome.storage.local exclusively (never sync) — see CFG-001.
+ * has a value, then fall empty base URL / model back to defaults. Uses chrome.storage.local
+ * exclusively (never sync) — see CFG-001.
  */
 export async function loadSettings(): Promise<Settings> {
   const result = await chrome.storage.local.get(STORAGE_KEY);
   const stored = result[STORAGE_KEY] as Partial<Settings> | undefined;
-  return { ...DEFAULTS, ...(stored ?? {}) };
+  return withDefaults({ ...DEFAULTS, ...(stored ?? {}) });
 }
 
-/** Merge a partial patch into stored settings and persist to chrome.storage.local. */
+/** Merge a partial patch into stored settings and persist to chrome.storage.local. Empty
+ *  base URL / model are persisted as-is (reflecting user input); the returned value falls
+ *  them back to defaults via withDefaults. */
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
   const current = await loadSettings();
   const next: Settings = { ...current, ...patch };
   await chrome.storage.local.set({ [STORAGE_KEY]: next });
-  return next;
+  return withDefaults(next);
 }

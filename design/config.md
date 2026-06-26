@@ -5,15 +5,15 @@
 ## Specs
 
 - CFG-001 [DONE] settings persistence: settings persist in chrome.storage.local (not synced) so the API key never enters Chrome sync.
-- CFG-002 [DONE] defaults: default target language zh-CN, default trigger key Alt, built-in default system prompt, built-in compress prompt.
+- CFG-002 [DONE] defaults: default target language zh-CN, default trigger key Alt, built-in default system prompt, built-in compress prompt, default base URL `https://api.deepseek.com` and default model `deepseek-v4-flash` (DeepSeek as the primary backend; overridable for other OpenAI-compatible endpoints). API key has no default and must be filled. Empty base URL / model — including after the user clears and saves — fall back to these defaults via `withDefaults` in `loadSettings`/`saveSettings`, so a cleared field still resolves to the default rather than breaking requests.
 - CFG-003 [DONE] thinking + effort settings: Settings carry a thinking toggle (boolean, default off) and an effort level (low/medium/high/max, default low), persisted in chrome.storage.local alongside the rest.
 - CFG-004 [DONE] skipSameLang setting: Settings carry a `skipSameLang` boolean (default true) that gates CT-015's same-language hover skip. Not exposed in the options UI in v1 (on by default); may be surfaced later.
 
 ## Settings schema
 
-- `baseUrl`: string — OpenAI 兼容端点，如 `https://api.deepseek.com`。
-- `apiKey`: string — 仅 background 读取。
-- `model`: string — 如 `deepseek-v4-flash`（或 `deepseek-v4-pro`）。
+- `baseUrl`: string — OpenAI 兼容端点，默认 `https://api.deepseek.com`（DeepSeek 为首要后端，可改其他兼容端点）。
+- `apiKey`: string — 仅 background 读取；无默认，必填。
+- `model`: string — 默认 `deepseek-v4-flash`（也可 `deepseek-v4-pro` 或其他）。
 - `thinking`: boolean — DeepSeek 思考模式开关，默认关；开启时设置页弹出提示。
 - `effort`: string — `low`/`medium`/`high`/`max`，默认 `low`；仅在 thinking 开时随请求发出。DeepSeek 仅 high/max 生效（low/medium 映射 high），全范围保留以兼容其他后端。
 - `targetLang`: string — 默认 `zh-CN`。

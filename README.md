@@ -18,9 +18,9 @@
 
 - 点击工具栏扩展图标 → 弹窗里选择**目标语言**（默认简体中文）。
 - 点击弹窗里的「**设置…**」打开设置页，填写：
-  - **Base URL**：OpenAI 兼容端点，如 `https://api.deepseek.com`
-  - **API Key**：你的密钥（仅本地存储，不上传同步）
-  - **Model**：如 `deepseek-v4-flash`（也可用 `deepseek-v4-pro`）
+  - **Base URL**：留空即用默认 `https://api.deepseek.com`（DeepSeek 为首要后端，可改其他 OpenAI 兼容端点）
+  - **API Key**：你的密钥（仅本地存储，不上传同步；唯一必填项）
+  - **Model**：留空即用默认 `deepseek-v4-flash`（也可 `deepseek-v4-pro` 或其他）
   - **触发键**：`Alt` / `Shift` / `Ctrl` 三选一（默认 `Alt`）
   - **思考模式**：开关（默认关）。开启后 DeepSeek 先思考再翻译，译文可能更贴合语境，但会消耗思维链 token（按输出计费）且等待首字时间变长；开启时会弹出提示。
   - **思考强度**：`Low` / `Medium` / `High` / `Max` 单选（默认 `Low`）。仅思考模式开启时可选；DeepSeek 实际仅 `High` / `Max` 生效（`Low` / `Medium` 等同 `High`）。
