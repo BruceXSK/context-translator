@@ -9,11 +9,11 @@ const STORAGE_KEY = 'settings';
  * (never chrome.storage.sync), and is read solely by the background service worker.
  */
 export interface Settings {
-  /** OpenAI-compatible chat completions base URL, e.g. "https://api.deepseek.com/v1". */
+  /** OpenAI-compatible chat completions base URL, e.g. "https://api.deepseek.com". */
   baseUrl: string;
   /** API key — never synced, only read by the background service worker. */
   apiKey: string;
-  /** Model id, e.g. "deepseek-chat". */
+  /** Model id, e.g. "deepseek-v4-flash" (or "deepseek-v4-pro"). */
   model: string;
   /** Target language code, e.g. "zh-CN". */
   targetLang: string;

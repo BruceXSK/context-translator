@@ -18,9 +18,9 @@
 
 - 点击工具栏扩展图标 → 弹窗里选择**目标语言**（默认简体中文）。
 - 点击弹窗里的「**设置…**」打开设置页，填写：
-  - **Base URL**：OpenAI 兼容端点，如 `https://api.deepseek.com/v1`
+  - **Base URL**：OpenAI 兼容端点，如 `https://api.deepseek.com`
   - **API Key**：你的密钥（仅本地存储，不上传同步）
-  - **Model**：如 `deepseek-chat`
+  - **Model**：如 `deepseek-v4-flash`（也可用 `deepseek-v4-pro`）
   - **触发键**：`Alt` / `Shift` / `Ctrl` 三选一（默认 `Alt`）
   - **System Prompt**：可覆盖默认翻译提示
 - 保存即可。端点 / Key / 模型的改动**即时生效**；触发键与 system prompt 对**新加载的页面**生效（已打开的页面刷新一次即可）。

@@ -9,9 +9,9 @@
 
 ## Settings schema
 
-- `baseUrl`: string — OpenAI 兼容端点，如 `https://api.deepseek.com/v1`。
+- `baseUrl`: string — OpenAI 兼容端点，如 `https://api.deepseek.com`。
 - `apiKey`: string — 仅 background 读取。
-- `model`: string — 如 `deepseek-chat`。
+- `model`: string — 如 `deepseek-v4-flash`（或 `deepseek-v4-pro`）。
 - `targetLang`: string — 默认 `zh-CN`。
 - `triggerKey`: string — 默认 `Alt`。
 - `systemPrompt`: string — 默认见下，用户可覆盖。
