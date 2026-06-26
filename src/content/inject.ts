@@ -94,6 +94,58 @@ function stripTags(s: string): string {
   return s.replace(/<\/?[a-zA-Z][^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
+// CT-015: skip hover translation when the paragraph is already in the target language.
+// Two signals: (1) a matching [lang] attribute on the element/ancestor; (2) a Unicode-script
+// ratio test on the paragraph's plain text. Text with < 4 judgeable chars is let through
+// (translate rather than risk a false skip). Silent — no UI feedback. Hover only.
+function looksLikeTargetLang(text: string, el: Element, targetLang: string): boolean {
+  const target = (targetLang || '').toLowerCase();
+  if (!target) return false;
+  const langEl = el.closest('[lang]');
+  if (langEl && sameLang((langEl.getAttribute('lang') || '').toLowerCase(), target)) return true;
+  const judgeable = text.replace(/[\s\p{P}\p{S}]/gu, '');
+  if (judgeable.length < 4) return false;
+  const c = countScripts(judgeable);
+  const total = judgeable.length;
+  switch (target.split('-')[0]) {
+    case 'zh': // Han majority with no kana/hangul → Chinese (avoid ja/ko false hits).
+      return c.han > total * 0.5 && c.kana === 0 && c.hangul === 0;
+    case 'ja':
+      return c.kana > 0;
+    case 'ko':
+      return c.hangul > total * 0.3;
+    case 'ru': case 'uk': case 'be': case 'bg':
+      return c.cyrillic > total * 0.5;
+    case 'ar':
+      return c.arabic > total * 0.5;
+    default: // Latin-family (en/fr/de/es/...). Skip when Latin dominates and no CJK.
+      return c.latin > total * 0.5 && c.han === 0 && c.kana === 0 && c.hangul === 0;
+  }
+}
+
+// Exact match, or same primary subtag with no region variant on either side (so zh vs zh skips,
+// but zh-TW vs zh-CN does not — Traditional→Simplified may still be a meaningful translation).
+function sameLang(a: string, b: string): boolean {
+  if (a === b) return true;
+  const [pa, ra] = a.split('-');
+  const [pb, rb] = b.split('-');
+  return pa === pb && !ra && !rb;
+}
+
+function countScripts(s: string): { han: number; kana: number; hangul: number; latin: number; cyrillic: number; arabic: number } {
+  const c = { han: 0, kana: 0, hangul: 0, latin: 0, cyrillic: 0, arabic: 0 };
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    if ((cp >= 0x3400 && cp <= 0x4dbf) || (cp >= 0x4e00 && cp <= 0x9fff) || (cp >= 0xf900 && cp <= 0xfaff)) c.han++;
+    else if ((cp >= 0x3040 && cp <= 0x309f) || (cp >= 0x30a0 && cp <= 0x30ff)) c.kana++;
+    else if ((cp >= 0xac00 && cp <= 0xd7af) || (cp >= 0x1100 && cp <= 0x11ff)) c.hangul++;
+    else if ((cp >= 0x0041 && cp <= 0x005a) || (cp >= 0x0061 && cp <= 0x007a) || (cp >= 0x00c0 && cp <= 0x024f)) c.latin++;
+    else if (cp >= 0x0400 && cp <= 0x04ff) c.cyrillic++;
+    else if (cp >= 0x0600 && cp <= 0x06ff) c.arabic++;
+  }
+  return c;
+}
+
 /** Replace each element under `root` with an <x data-ct-id data-ct-tag> placeholder (nested for
  *  nested elements), storing a shallow clone (tag + attributes) of each original by id. */
 function extractSkeleton(root: Element): { skeleton: string; originals: Map<number, Element> } {
@@ -403,6 +455,8 @@ async function main(): Promise<void> {
     if (!target || isEditable(target)) return;
     const hit = findParagraph(target);
     if (!hit) return;
+    // CT-015: silently skip when the paragraph is already in the target language.
+    if (settings.skipSameLang && looksLikeTargetLang(stripTags(hit.skeleton), hit.el, settings.targetLang)) return;
     toggleHover(hit.el, hit.skeleton, hit.originals);
   }
 

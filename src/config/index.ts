@@ -23,6 +23,8 @@ export interface Settings {
   effort: string;
   /** Target language code, e.g. "zh-CN". */
   targetLang: string;
+  /** Skip hover translation when the paragraph is already in the target language (CT-015). Default true. */
+  skipSameLang: boolean;
   /** Hover-trigger key, e.g. "Alt". */
   triggerKey: string;
   /** System prompt; user-overridable, default DEFAULT_SYSTEM_PROMPT. */
@@ -52,6 +54,7 @@ export const DEFAULTS: Settings = {
   thinking: false,
   effort: 'low',
   targetLang: 'zh-CN',
+  skipSameLang: true,
   triggerKey: 'Alt',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };

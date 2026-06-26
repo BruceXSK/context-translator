@@ -7,6 +7,7 @@
 - CFG-001 [DONE] settings persistence: settings persist in chrome.storage.local (not synced) so the API key never enters Chrome sync.
 - CFG-002 [DONE] defaults: default target language zh-CN, default trigger key Alt, built-in default system prompt, built-in compress prompt.
 - CFG-003 [DONE] thinking + effort settings: Settings carry a thinking toggle (boolean, default off) and an effort level (low/medium/high/max, default low), persisted in chrome.storage.local alongside the rest.
+- CFG-004 [DONE] skipSameLang setting: Settings carry a `skipSameLang` boolean (default true) that gates CT-015's same-language hover skip. Not exposed in the options UI in v1 (on by default); may be surfaced later.
 
 ## Settings schema
 
@@ -16,6 +17,7 @@
 - `thinking`: boolean — DeepSeek 思考模式开关，默认关；开启时设置页弹出提示。
 - `effort`: string — `low`/`medium`/`high`/`max`，默认 `low`；仅在 thinking 开时随请求发出。DeepSeek 仅 high/max 生效（low/medium 映射 high），全范围保留以兼容其他后端。
 - `targetLang`: string — 默认 `zh-CN`。
+- `skipSameLang`: boolean — 默认 `true`；悬停段落已是目标语言时静默跳过翻译（CT-015）。v1 不在设置页暴露。
 - `triggerKey`: string — 默认 `Alt`。
 - `systemPrompt`: string — 默认见下，用户可覆盖。
 
