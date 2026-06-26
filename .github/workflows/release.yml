@@ -1,0 +1,50 @@
+name: Release
+
+# Server-side build & publish. Triggered by pushing a v* tag (e.g. v0.1.0).
+# No local packaging — the runner builds, zips, and creates the GitHub Release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Verify version matches tag
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          MV=$(node -e "process.stdout.write(require('./dist/manifest.json').version)")
+          PV=$(node -e "process.stdout.write(require('./package.json').version)")
+          echo "tag=$TAG manifest=$MV package=$PV"
+          if [ "$TAG" != "$MV" ] || [ "$TAG" != "$PV" ]; then
+            echo "::error::Version mismatch — tag=$TAG manifest=$MV package=$PV. Bump manifest.config.ts and package.json to $TAG, commit, re-tag."
+            exit 1
+          fi
+
+      - name: Package zip (top-level versioned dir)
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          NAME="context-translator-${VERSION}"
+          mkdir "$NAME"
+          cp -r dist/* "$NAME/"
+          test -f "$NAME/manifest.json"
+          zip -r "$NAME.zip" "$NAME"
+          echo "PACKAGE=$NAME.zip" >> "$GITHUB_ENV"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.PACKAGE }}
+          generate_release_notes: false

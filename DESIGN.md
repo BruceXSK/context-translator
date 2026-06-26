@@ -15,6 +15,7 @@ Global design: purpose, architecture, structure, modules index, and cross-cuttin
 - ARCH-009 [DONE] platform baseline: Manifest V3 built with TypeScript, Vite, and @crxjs/vite-plugin.
 - ARCH-010 [DONE] markup-preserving translation output: the LLM returns the translated HTML preserving the inline-element markup (real tags + data-ct-id), with no preamble or explanation.
 - ARCH-011 [DONE] translation direction: source language is auto-detected; target language is configurable with default Simplified Chinese.
+- ARCH-012 [DONE] release automation: a GitHub Actions workflow (.github/workflows/release.yml) builds and publishes the extension on GitHub's servers (no local packaging). Triggered by pushing a `v*` tag; CI runs `npm ci` → `npm run build` → verifies the tag, `dist/manifest.json` version, and `package.json` version all match (fails on mismatch so a forgotten version bump is caught) → packages `dist/` into a top-level versioned directory (`context-translator-<version>/`, `manifest.json` at its root) and zips it → creates a GitHub Release via `softprops/action-gh-release@v2` with the zip attached, `generate_release_notes: false` and no body (installation instructions live in README, not the release body). Version source of truth: `manifest.config.ts` + `package.json`, bumped manually before tagging. Users install by downloading the zip, extracting the versioned folder, and loading it unpacked in Chrome (Chrome blocks installing unlisted .crx on Windows/macOS, so zip + load-unpacked is the only cross-platform path).
 
 ## Purpose
 

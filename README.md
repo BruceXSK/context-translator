@@ -43,6 +43,16 @@
 
 > 会话按页面绑定：刷新页面会重置会话与上下文。
 
+## 从 Release 安装
+
+1. 到 [Releases 页](https://github.com/BruceXSK/context-translator/releases) 下载最新 `context-translator-<version>.zip`
+2. 解压，得到 `context-translator-<version>/` 文件夹
+3. 打开 `chrome://extensions` → 右上角开启「**开发者模式**」
+4. 点「**加载已解压的扩展程序**」→ 选择解压出的文件夹
+5. 点工具栏图标 →「**设置…**」填端点 / API Key / 模型 → 保存
+
+> Chrome 不允许直接安装未上架的 .crx，因此通过「加载已解压」使用下载的 zip。
+
 ## 构建并加入 Chrome
 
 ### 步骤
