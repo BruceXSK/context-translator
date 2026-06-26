@@ -67,6 +67,7 @@ context-translator/
 | session | SES | [design/session.md](./design/session.md) |
 | popup | POP | [design/popup.md](./design/popup.md) |
 | config | CFG | [design/config.md](./design/config.md) |
+| deepseek | DS | [design/deepseek.md](./design/deepseek.md) |
 
 ## troubleshooting
 
