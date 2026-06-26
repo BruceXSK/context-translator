@@ -95,21 +95,23 @@ function stripTags(s: string): string {
 }
 
 // CT-015: skip hover translation when the paragraph is already in the target language.
-// Two signals: (1) a matching [lang] attribute on the element/ancestor; (2) a Unicode-script
-// ratio test on the paragraph's plain text. Text with < 4 judgeable chars is let through
-// (translate rather than risk a false skip). Silent — no UI feedback. Hover only.
-function looksLikeTargetLang(text: string, el: Element, targetLang: string): boolean {
+// A pure Unicode-script ratio test on the paragraph's plain text decides whether the content's
+// script matches the target language's primary script (Han for zh-*, kana for ja, hangul for ko,
+// Cyrillic, Arabic, Latin for the rest; unknown target never skips). The [lang] attribute is
+// intentionally NOT consulted — closest('[lang]') can climb to a page-level tag that does not
+// describe the paragraph (e.g. GitHub's <html lang="en"> over a Chinese README, which wrongly
+// forced translation of Chinese), and same-script languages cannot be reliably told apart by lang
+// anyway. Silent — no UI feedback. Hover only; gated by skipSameLang (CFG-004).
+function looksLikeTargetLang(text: string, targetLang: string): boolean {
   const target = (targetLang || '').toLowerCase();
   if (!target) return false;
-  const langEl = el.closest('[lang]');
-  if (langEl && sameLang((langEl.getAttribute('lang') || '').toLowerCase(), target)) return true;
   const judgeable = text.replace(/[\s\p{P}\p{S}]/gu, '');
-  if (judgeable.length < 4) return false;
   const c = countScripts(judgeable);
   const total = judgeable.length;
   switch (target.split('-')[0]) {
-    case 'zh': // Han majority with no kana/hangul → Chinese (avoid ja/ko false hits).
-      return c.han > total * 0.5 && c.kana === 0 && c.hangul === 0;
+    case 'zh': // Han > 20% with no kana/hangul → Chinese. Low threshold so CJK-heavy mixed
+      // Chinese/English text still skips; zero kana/hangul avoids ja/ko false hits.
+      return c.han > total * 0.2 && c.kana === 0 && c.hangul === 0;
     case 'ja':
       return c.kana > 0;
     case 'ko':
@@ -118,18 +120,9 @@ function looksLikeTargetLang(text: string, el: Element, targetLang: string): boo
       return c.cyrillic > total * 0.5;
     case 'ar':
       return c.arabic > total * 0.5;
-    default: // Latin-family (en/fr/de/es/...). Skip when Latin dominates and no CJK.
+    default: // Latin-family (en/fr/de/es/...). Match when Latin dominates and no CJK.
       return c.latin > total * 0.5 && c.han === 0 && c.kana === 0 && c.hangul === 0;
   }
-}
-
-// Exact match, or same primary subtag with no region variant on either side (so zh vs zh skips,
-// but zh-TW vs zh-CN does not — Traditional→Simplified may still be a meaningful translation).
-function sameLang(a: string, b: string): boolean {
-  if (a === b) return true;
-  const [pa, ra] = a.split('-');
-  const [pb, rb] = b.split('-');
-  return pa === pb && !ra && !rb;
 }
 
 function countScripts(s: string): { han: number; kana: number; hangul: number; latin: number; cyrillic: number; arabic: number } {
@@ -456,7 +449,7 @@ async function main(): Promise<void> {
     const hit = findParagraph(target);
     if (!hit) return;
     // CT-015: silently skip when the paragraph is already in the target language.
-    if (settings.skipSameLang && looksLikeTargetLang(stripTags(hit.skeleton), hit.el, settings.targetLang)) return;
+    if (settings.skipSameLang && looksLikeTargetLang(stripTags(hit.skeleton), settings.targetLang)) return;
     toggleHover(hit.el, hit.skeleton, hit.originals);
   }
 
