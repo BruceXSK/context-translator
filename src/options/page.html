@@ -61,6 +61,7 @@
       <label>Base URL<input name="baseUrl" type="url" placeholder="https://api.deepseek.com" /></label>
       <label>API Key<input name="apiKey" type="password" placeholder="sk-..." /></label>
       <label>Model<input name="model" placeholder="deepseek-v4-flash" /></label>
+      <label>最大上下文（K）<input name="maxContextK" type="number" min="1" step="1" inputmode="numeric" placeholder="1000" /><span class="hint">对应模型的上下文窗口，单位 K；默认 1000 = 1M（deepseek-v4-flash）。弹窗上下文用量仪表的分母。</span></label>
       <fieldset class="trigger">
         <legend>触发键</legend>
         <div class="segmented">
@@ -84,7 +85,7 @@
       </fieldset>
       <label>Custom Prompt<textarea name="customPrompt" rows="6" placeholder="可选。补充领域 / 术语 / 语气等指引；作为用户指引折入首条翻译，位于系统提示词之后、不可覆盖翻译规则。保存后需刷新已打开页面生效。"></textarea></label>
       <div class="actions"><button type="submit">保存</button><span id="status"></span></div>
-      <p class="hint">目标语言在工具栏弹窗里切换。改动对整个浏览器生效：端点 / key / 模型 / 思考模式 / 思考强度即时生效；触发键与自定义提示词对新加载的页面生效（已打开页面需刷新）。</p>
+      <p class="hint">目标语言在工具栏弹窗里切换。改动对整个浏览器生效：端点 / key / 模型 / 最大上下文 / 思考模式 / 思考强度即时生效；触发键与自定义提示词对新加载的页面生效（已打开页面需刷新）。</p>
     </form>
     <div id="toast" class="toast" hidden>
       <div class="toast-body">

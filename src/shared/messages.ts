@@ -19,6 +19,14 @@ export interface Usage {
   promptCacheMissTokens?: number;
 }
 
+// Aggregate usage for the popup display (POP-003): cumulative across all committed
+// responses + the most recent translation response (compress responses update the
+// cumulative total but do not replace `last`; see SES-005).
+export interface UsageSnapshot {
+  cumulative: Usage;
+  last: Usage | null;
+}
+
 // Runtime request messages (chrome.runtime / chrome.tabs messaging).
 // translate / compress: content -> background (carries the assembled messages array,
 // since the service worker is stateless and the content script owns the session).
@@ -34,7 +42,7 @@ export type RuntimeRequest =
 
 export type RuntimeResponse =
   | { kind: 'ok' }
-  | { kind: 'usage'; usage: Usage }
+  | { kind: 'usage'; usage: UsageSnapshot }
   | { kind: 'error'; message: string };
 
 // Streaming events pushed over a Port (background -> content), one per token chunk.

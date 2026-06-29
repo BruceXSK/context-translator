@@ -31,6 +31,10 @@ export interface Settings {
    *  user message's <user-instruction> block of each session-segment (CFG-005). Default empty.
    *  Snapshotted by the content script on page load, so a saved change needs a page refresh. */
   customPrompt: string;
+  /** Max context window in K tokens (CFG-006). Default 1000 (= 1M for deepseek-v4-flash).
+   *  User-supplied since the API doesn't return it; denominator for the popup context gauge
+   *  (POP-003). A non-positive value falls back to 1000K via withDefaults. */
+  maxContextK: number;
 }
 
 /**
@@ -62,6 +66,7 @@ export const DEFAULTS: Settings = {
   skipSameLang: true,
   triggerKey: 'Alt',
   customPrompt: '',
+  maxContextK: 1000,
 };
 
 /** Human-readable labels for common target language codes. */
@@ -86,7 +91,12 @@ export function langLabel(code: string): string {
  *  saving still resolves to the default rather than breaking requests. The API key is
  *  intentionally not defaulted — it must be filled by the user. */
 function withDefaults(s: Settings): Settings {
-  return { ...s, baseUrl: s.baseUrl || DEFAULTS.baseUrl, model: s.model || DEFAULTS.model };
+  return {
+    ...s,
+    baseUrl: s.baseUrl || DEFAULTS.baseUrl,
+    model: s.model || DEFAULTS.model,
+    maxContextK: s.maxContextK > 0 ? s.maxContextK : DEFAULTS.maxContextK,
+  };
 }
 
 /**

@@ -24,6 +24,16 @@
       button.ghost:hover{background:var(--paper-2);filter:none}
       #status{font-size:.75rem;color:var(--accent);min-height:1em}
       .hint{font-size:.68rem;color:var(--ink-soft);text-transform:none;letter-spacing:0;font-weight:400;margin-top:-3px}
+      .page-info{padding:12px 16px 4px;border-top:1px solid var(--rule);margin-top:12px}
+      .page-info h2{margin:0 0 9px;font-family:var(--sans);font-size:.66rem;letter-spacing:.08em;color:var(--ink-soft);text-transform:uppercase;font-weight:600}
+      .pi-row{display:flex;align-items:center;gap:9px;margin-bottom:7px;font-size:.78rem}
+      .pi-row.ctx{gap:8px}
+      .pi-row:not(.ctx){justify-content:space-between}
+      .pi-label{color:var(--ink-soft);font-weight:600;letter-spacing:.02em}
+      .pi-row.ctx .pi-label{width:46px;flex:0 0 auto}
+      .bar{flex:1 1 auto;height:8px;border-radius:999px;background:var(--rule);overflow:hidden}
+      .bar-fill{height:100%;width:0;background:var(--ink-soft);border-radius:999px;transition:width .2s}
+      .pi-val{flex:0 0 auto;color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
     </style>
   </head>
   <body>
@@ -47,9 +57,23 @@
         <button type="button" id="openOptions" class="ghost">设置…</button>
         <span id="status"></span>
       </div>
-      <p class="hint">悬停段落并轻按触发键即翻译；选定文字右键「翻译」在悬浮窗查看。</p>
-      <p class="hint">端点 / API key / 模型 / 触发键 / system prompt 在「设置…」里配置。</p>
     </form>
+    <section class="page-info">
+      <h2>当前页</h2>
+      <div class="pi-row ctx">
+        <span class="pi-label">Context</span>
+        <div class="bar"><div id="ctxFill" class="bar-fill"></div></div>
+        <span id="ctxText" class="pi-val">—</span>
+      </div>
+      <div class="pi-row">
+        <span class="pi-label">Last Cache Hit Rate</span>
+        <span id="lastRate" class="pi-val">—</span>
+      </div>
+      <div class="pi-row">
+        <span class="pi-label">Total Cache Hit Rate</span>
+        <span id="totalRate" class="pi-val">—</span>
+      </div>
+    </section>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

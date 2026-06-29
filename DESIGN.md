@@ -29,7 +29,7 @@ MV3 三层加一个配置模块：
 - **content script（每页一份）**：持有本页 session 消息数组与 pending 上下文缓冲；负责悬停检测、段落抽取、译文块嵌入与三态显隐、划线悬浮窗、Shadow DOM UI、流式 DOM 更新、原位错误反馈。页面刷新即销毁，session 随之重置。
 - **background service worker（无状态）**：唯一持有 API key 的入口，向 OpenAI 兼容端点发起 `stream:true` 的 chat completions 请求，解析 SSE 并逐 chunk 转发回 content，完成时回传 token usage（含 DeepSeek 缓存字段）。注册右键菜单「翻译」「理解」，点击后转发给当前 tab 的 content。
 - **popup**：设置表单（base URL / key / model / 目标语言 / 触发键 / system prompt）、手动上下文输入、当前页 token 用量展示、压缩/清空 session 按钮。经 chrome.runtime 消息与当前 tab 的 content 通信。
-- **config**：设置持久化于 `chrome.storage.local`（不同步，避免 key 进 Chrome sync），提供默认值与内置（不可改）system prompt、内置 compress prompt、用户可改 custom prompt。
+- **config**：设置持久化于 `chrome.storage.local`（不同步，避免 key 进 Chrome sync），提供默认值与内置（不可改）system prompt、内置 compress prompt、用户可改 custom prompt、用户可配最大上下文 `maxContextK`（默认 1000K，CFG-006）。
 
 数据流：content 组装完整消息数组 → 发给 background → background 流式调用并回传 chunk + 最终 usage → content 渐进渲染、完成后提交响应进 session、累计 usage。压缩/手动上下文/清空由 popup 经消息触发 content 执行。
 

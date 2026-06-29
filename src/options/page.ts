@@ -25,6 +25,7 @@ async function populate(): Promise<void> {
   effortRadios.value = ['low', 'medium', 'high', 'max'].includes(s.effort) ? s.effort : 'low';
   syncEffortDisabled();
   (field('customPrompt') as HTMLTextAreaElement).value = s.customPrompt;
+  (field('maxContextK') as HTMLInputElement).value = String(s.maxContextK);
 }
 
 /** Disable the effort fieldset (greyed) when thinking is off; enable when on. */
@@ -60,7 +61,8 @@ form?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(form);
   const effortVal = String(fd.get('effort') ?? 'low');
-  const patch: Pick<Settings, 'baseUrl' | 'apiKey' | 'model' | 'thinking' | 'effort' | 'triggerKey' | 'customPrompt'> = {
+  const maxCtxRaw = Number(fd.get('maxContextK'));
+  const patch: Pick<Settings, 'baseUrl' | 'apiKey' | 'model' | 'thinking' | 'effort' | 'triggerKey' | 'customPrompt' | 'maxContextK'> = {
     baseUrl: String(fd.get('baseUrl') ?? '').trim(),
     apiKey: String(fd.get('apiKey') ?? ''),
     model: String(fd.get('model') ?? '').trim(),
@@ -68,6 +70,7 @@ form?.addEventListener('submit', async (e) => {
     effort: ['low', 'medium', 'high', 'max'].includes(effortVal) ? effortVal : 'low',
     triggerKey: String(fd.get('triggerKey') ?? 'Alt') || 'Alt',
     customPrompt: String(fd.get('customPrompt') ?? '').trim(),
+    maxContextK: Number.isFinite(maxCtxRaw) && maxCtxRaw > 0 ? Math.floor(maxCtxRaw) : 1000,
   };
   await saveSettings(patch);
   if (status) {

@@ -2,7 +2,7 @@
 // compress-to-summary, and cumulative token usage.
 // See design/session.md (SES-001 .. SES-005).
 
-import type { ChatMessage, Usage } from '../shared/messages';
+import type { ChatMessage, Usage, UsageSnapshot } from '../shared/messages';
 import { COMPRESS_PROMPT, DEFAULT_SYSTEM_PROMPT, langLabel } from '../config';
 
 /** A buffered context item not yet sent to the LLM. */
@@ -21,6 +21,9 @@ export class Session {
   private turns: ChatMessage[] = [];
   private pending: PendingItem[] = [];
   private cumulativeUsage: Usage = { promptTokens: 0, completionTokens: 0 };
+  /** Snapshot of the most recent translation response's usage (for the popup's context
+   *  gauge and Last cache rate, POP-003). Compress responses do NOT replace this. */
+  private lastUsage: Usage | null = null;
   /** The user message of the most recent in-flight request, awaiting commit. */
   private pendingUserContent: string | null = null;
 
@@ -34,6 +37,7 @@ export class Session {
     this.turns = [];
     this.pending = [];
     this.cumulativeUsage = { promptTokens: 0, completionTokens: 0 };
+    this.lastUsage = null;
     this.pendingUserContent = null;
   }
 
@@ -69,6 +73,7 @@ export class Session {
     this.turns.push({ role: 'assistant', content: assistantText });
     this.pending = [];
     this.pendingUserContent = null;
+    this.lastUsage = { ...usage };
     this.accumulateUsage(usage);
   }
 
@@ -89,9 +94,13 @@ export class Session {
     this.accumulateUsage(usage);
   }
 
-  /** Cumulative token usage across all committed responses (for the popup display). */
-  getUsage(): Usage {
-    return { ...this.cumulativeUsage };
+  /** Cumulative usage across all committed responses plus the last translation response's
+   *  usage, for the popup display (POP-003). */
+  getUsage(): UsageSnapshot {
+    return {
+      cumulative: { ...this.cumulativeUsage },
+      last: this.lastUsage ? { ...this.lastUsage } : null,
+    };
   }
 
   private systemMessage(): ChatMessage {
