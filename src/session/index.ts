@@ -3,7 +3,7 @@
 // See design/session.md (SES-001 .. SES-005).
 
 import type { ChatMessage, Usage } from '../shared/messages';
-import { COMPRESS_PROMPT, langLabel } from '../config';
+import { COMPRESS_PROMPT, DEFAULT_SYSTEM_PROMPT, langLabel } from '../config';
 
 /** A buffered context item not yet sent to the LLM. */
 export interface PendingItem {
@@ -25,8 +25,8 @@ export class Session {
   private pendingUserContent: string | null = null;
 
   constructor(
-    private readonly systemPrompt: string,
     private readonly targetLang: string,
+    private readonly customPrompt: string,
   ) {}
 
   /** Reset to a fresh session (clear action / new page). */
@@ -47,9 +47,13 @@ export class Session {
     if (text) this.pending.push({ kind: 'instruction', text });
   }
 
-  /** Build the full message array for a translation request (pending folded, not yet committed). */
+  /** Build the full message array for a translation request (pending folded, not yet committed).
+   *  The custom prompt (CFG-005) is folded into the <user-instruction> block only on the first
+   *  user message of a session-segment (no committed user turns yet — also re-added after a
+   *  compress or clear), so it appears once per segment rather than every turn. */
   buildTranslateRequest(text: string): ChatMessage[] {
-    const userContent = this.foldPending(text);
+    const includeCustom = !this.turns.some((t) => t.role === 'user');
+    const userContent = this.foldPending(text, includeCustom);
     this.pendingUserContent = userContent;
     return [this.systemMessage(), ...this.turns, { role: 'user', content: userContent }];
   }
@@ -91,13 +95,18 @@ export class Session {
   }
 
   private systemMessage(): ChatMessage {
-    return { role: 'system', content: `${this.systemPrompt}\n\nTarget language: ${langLabel(this.targetLang)}.` };
+    return { role: 'system', content: `${DEFAULT_SYSTEM_PROMPT}\n\nTarget language: ${langLabel(this.targetLang)}.` };
   }
 
-  /** Fold pending context into the translation user message with the three XML tags (SES-002). */
-  private foldPending(text: string): string {
+  /** Fold pending context into the translation user message with the XML tags (SES-002).
+   *  When includeCustom is set (first user message of a segment), the page-snapshotted custom
+   *  prompt leads the <user-instruction> block — reusing the existing tag, not a new one (CFG-005). */
+  private foldPending(text: string, includeCustom: boolean): string {
     const contextText = this.pending.filter((p) => p.kind === 'context').map((p) => p.text).join('\n\n');
-    const instructionText = this.pending.filter((p) => p.kind === 'instruction').map((p) => p.text).join('\n\n');
+    const instrParts: string[] = [];
+    if (includeCustom && this.customPrompt.trim()) instrParts.push(this.customPrompt.trim());
+    for (const p of this.pending) if (p.kind === 'instruction') instrParts.push(p.text);
+    const instructionText = instrParts.join('\n\n');
     let content = '';
     if (contextText) content += `<context>\n${contextText}\n</context>\n`;
     if (instructionText) content += `<user-instruction>\n${instructionText}\n</user-instruction>\n`;

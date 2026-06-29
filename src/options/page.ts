@@ -1,7 +1,7 @@
-// Options page (POP-006): base URL / API key / model / trigger key / system prompt / thinking + effort.
+// Options page (POP-006): base URL / API key / model / trigger key / custom prompt / thinking + effort.
 // Reads/writes chrome.storage.local via the config module (shared schema with the popup).
 // Saves a partial patch so the popup-owned targetLang is left untouched.
-import { DEFAULT_SYSTEM_PROMPT, loadSettings, saveSettings, type Settings } from '../config';
+import { loadSettings, saveSettings, type Settings } from '../config';
 
 const form = document.getElementById('settings') as HTMLFormElement | null;
 const status = document.getElementById('status');
@@ -24,7 +24,7 @@ async function populate(): Promise<void> {
   const effortRadios = form!.elements.namedItem('effort') as RadioNodeList;
   effortRadios.value = ['low', 'medium', 'high', 'max'].includes(s.effort) ? s.effort : 'low';
   syncEffortDisabled();
-  (field('systemPrompt') as HTMLTextAreaElement).value = s.systemPrompt;
+  (field('customPrompt') as HTMLTextAreaElement).value = s.customPrompt;
 }
 
 /** Disable the effort fieldset (greyed) when thinking is off; enable when on. */
@@ -60,14 +60,14 @@ form?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(form);
   const effortVal = String(fd.get('effort') ?? 'low');
-  const patch: Pick<Settings, 'baseUrl' | 'apiKey' | 'model' | 'thinking' | 'effort' | 'triggerKey' | 'systemPrompt'> = {
+  const patch: Pick<Settings, 'baseUrl' | 'apiKey' | 'model' | 'thinking' | 'effort' | 'triggerKey' | 'customPrompt'> = {
     baseUrl: String(fd.get('baseUrl') ?? '').trim(),
     apiKey: String(fd.get('apiKey') ?? ''),
     model: String(fd.get('model') ?? '').trim(),
     thinking: fd.get('thinking') === 'on',
     effort: ['low', 'medium', 'high', 'max'].includes(effortVal) ? effortVal : 'low',
     triggerKey: String(fd.get('triggerKey') ?? 'Alt') || 'Alt',
-    systemPrompt: String(fd.get('systemPrompt') ?? '').trim() || DEFAULT_SYSTEM_PROMPT,
+    customPrompt: String(fd.get('customPrompt') ?? '').trim(),
   };
   await saveSettings(patch);
   if (status) {

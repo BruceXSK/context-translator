@@ -398,7 +398,7 @@ function selectionRect(): DOMRect | null {
 // ---------- main ----------
 async function main(): Promise<void> {
   const settings: Settings = await loadSettings();
-  const session = new Session(settings.systemPrompt, settings.targetLang);
+  const session = new Session(settings.targetLang, settings.customPrompt);
   const triggerKey = settings.triggerKey || 'Alt';
   const panel = new PanelView();
   (document.body || document.documentElement).appendChild(panel.host);

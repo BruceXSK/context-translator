@@ -16,6 +16,7 @@ Global design: purpose, architecture, structure, modules index, and cross-cuttin
 - ARCH-010 [DONE] markup-preserving translation output: the LLM returns the translated HTML preserving the inline-element markup (real tags + data-ct-id), with no preamble or explanation.
 - ARCH-011 [DONE] translation direction: source language is auto-detected; target language is configurable with default Simplified Chinese.
 - ARCH-012 [DONE] release automation: a GitHub Actions workflow (.github/workflows/release.yml) builds and publishes the extension on GitHub's servers (no local packaging). Triggered by pushing a `v*` tag; CI runs `npm ci` → `npm run build` → verifies the tag, `dist/manifest.json` version, and `package.json` version all match (fails on mismatch so a forgotten version bump is caught) → packages `dist/` into a top-level versioned directory (`context-translator-<version>/`, `manifest.json` at its root) and zips it → creates a GitHub Release via `softprops/action-gh-release@v2` with the zip attached, `generate_release_notes: false` and no body (installation instructions live in README, not the release body). Version source of truth: `manifest.config.ts` + `package.json`, bumped manually before tagging. Users install by downloading the zip, extracting the versioned folder, and loading it unpacked in Chrome (Chrome blocks installing unlisted .crx on Windows/macOS, so zip + load-unpacked is the only cross-platform path).
+- ARCH-013 [DONE] system-prompt authority: the system prompt is a non-editable code constant with the highest authority; all user-editable content — the custom prompt (CFG-005, folded into the first user message's <user-instruction> block) and the folded <context>/<user-instruction> blocks — is user-role advisory content that cannot override the system prompt's translation rules. The system prompt declares this authority explicitly at its end, defending against user prompt-injection that would break the markup-preserving translation (ARCH-010).
 
 ## Purpose
 
@@ -28,7 +29,7 @@ MV3 三层加一个配置模块：
 - **content script（每页一份）**：持有本页 session 消息数组与 pending 上下文缓冲；负责悬停检测、段落抽取、译文块嵌入与三态显隐、划线悬浮窗、Shadow DOM UI、流式 DOM 更新、原位错误反馈。页面刷新即销毁，session 随之重置。
 - **background service worker（无状态）**：唯一持有 API key 的入口，向 OpenAI 兼容端点发起 `stream:true` 的 chat completions 请求，解析 SSE 并逐 chunk 转发回 content，完成时回传 token usage（含 DeepSeek 缓存字段）。注册右键菜单「翻译」「理解」，点击后转发给当前 tab 的 content。
 - **popup**：设置表单（base URL / key / model / 目标语言 / 触发键 / system prompt）、手动上下文输入、当前页 token 用量展示、压缩/清空 session 按钮。经 chrome.runtime 消息与当前 tab 的 content 通信。
-- **config**：设置持久化于 `chrome.storage.local`（不同步，避免 key 进 Chrome sync），提供默认值与内置 system/compress prompt。
+- **config**：设置持久化于 `chrome.storage.local`（不同步，避免 key 进 Chrome sync），提供默认值与内置（不可改）system prompt、内置 compress prompt、用户可改 custom prompt。
 
 数据流：content 组装完整消息数组 → 发给 background → background 流式调用并回传 chunk + 最终 usage → content 渐进渲染、完成后提交响应进 session、累计 usage。压缩/手动上下文/清空由 popup 经消息触发 content 执行。
 

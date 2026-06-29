@@ -1,6 +1,6 @@
 // Popup quick settings (POP-001): target language + open the settings page.
 // Reads/writes chrome.storage.local via the config module; saves a partial patch so
-// the options-page-owned fields (baseUrl/apiKey/model/triggerKey/systemPrompt) stay intact.
+// the options-page-owned fields (baseUrl/apiKey/model/triggerKey/customPrompt) stay intact.
 import { loadSettings, saveSettings } from '../config';
 
 const form = document.getElementById('settings') as HTMLFormElement | null;

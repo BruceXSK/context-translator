@@ -4,7 +4,7 @@ DeepSeek 作为参考后端的特调知识与兼容性注意。插件对所有 L
 
 ## Specs
 
-- DS-001 [DONE] cache-prefix-stable request shape: requests are shaped to hit DeepSeek's context cache as a stable prefix unit — the system message leads and is constant within a page, committed turns append in order, buffered context sits at the tail of the user message, and history is never auto-truncated. (Deepens ARCH-006 for the DeepSeek KV-cache prefix-unit model.)
+- DS-001 [DONE] cache-prefix-stable request shape: requests are shaped to hit DeepSeek's context cache as a stable prefix unit — the system message leads and is constant within a page, committed turns append in order, the custom prompt leads the first user message's <user-instruction> block (constant per page, CFG-005) with buffered context/instruction within the user message, and history is never auto-truncated. (Deepens ARCH-006 for the DeepSeek KV-cache prefix-unit model.)
 - DS-002 [DONE] no reasoning_content roundtrip: multi-round history carries only the assistant's final content, never its reasoning_content, so thinking-mode chains neither enter the prefix nor break cache hits, matching DeepSeek thinking-mode guidance for tool-free turns.
 - DS-003 [DONE] current model-name examples: examples and placeholders use deepseek-v4-flash (or deepseek-v4-pro), not deepseek-chat / deepseek-reasoner, which are deprecated 2026/07/24.
 - DS-004 [DONE] canonical base-url example: the example base URL is the canonical https://api.deepseek.com (no /v1); URL joining still tolerates a user-supplied /v1.

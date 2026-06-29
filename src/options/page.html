@@ -82,9 +82,9 @@
           <label class="seg"><input type="radio" name="effort" value="max" /><span>MAX</span></label>
         </div>
       </fieldset>
-      <label>System Prompt<textarea name="systemPrompt" rows="10"></textarea></label>
+      <label>Custom Prompt<textarea name="customPrompt" rows="6" placeholder="可选。补充领域 / 术语 / 语气等指引；作为用户指引折入首条翻译，位于系统提示词之后、不可覆盖翻译规则。保存后需刷新已打开页面生效。"></textarea></label>
       <div class="actions"><button type="submit">保存</button><span id="status"></span></div>
-      <p class="hint">目标语言在工具栏弹窗里切换。改动对整个浏览器生效：端点 / key / 模型即时生效；触发键与 system prompt 对新加载的页面生效。</p>
+      <p class="hint">目标语言在工具栏弹窗里切换。改动对整个浏览器生效：端点 / key / 模型 / 思考模式 / 思考强度即时生效；触发键与自定义提示词对新加载的页面生效（已打开页面需刷新）。</p>
     </form>
     <div id="toast" class="toast" hidden>
       <div class="toast-body">
