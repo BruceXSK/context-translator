@@ -229,7 +229,10 @@ class BlockView implements View {
   readonly host: HTMLElement;
   private textEl: HTMLElement;
   private errorEl: HTMLElement;
+  private retransBtn: HTMLElement;
   private readonly originals: Map<number, Element>;
+  // CT-016: re-translate button bound after the view is attached to a paragraph.
+  private onRetranslate: (() => void) | null = null;
   // CT-012: animated "Translating…" placeholder shown from start() until the first chunk.
   // Driven by a timer (not CSS @keyframes) because the block is light-DOM with no shadow
   // (CT-010): a global <style> would collide with / leak into the host page.
@@ -248,7 +251,38 @@ class BlockView implements View {
       '<span class="ct-error" hidden style="color:#9a3b32"></span>';
     this.textEl = this.host.querySelector<HTMLElement>('.ct-text')!;
     this.errorEl = this.host.querySelector<HTMLElement>('.ct-error')!;
+    // CT-016: a small "re-translate" icon button appended after the translation. Light-DOM,
+    // all inline styles (no shadow to scope a class rule, same constraint as the spinner).
+    // ↻ = U+21BB CLOCKWISE OPEN CIRCLE ARROW. Hidden until a translation completes.
+    this.retransBtn = document.createElement('span');
+    this.retransBtn.className = 'ct-retrans';
+    this.retransBtn.textContent = '↻';
+    this.retransBtn.title = '重新翻译';
+    this.retransBtn.setAttribute('aria-label', '重新翻译');
+    this.retransBtn.setAttribute('role', 'button');
+    this.retransBtn.tabIndex = 0;
+    this.retransBtn.style.cssText =
+      'display:none;cursor:pointer;margin-left:.45em;font-size:.85em;opacity:.4;' +
+      'user-select:none;vertical-align:baseline;line-height:1';
+    this.host.appendChild(this.retransBtn);
+    this.retransBtn.addEventListener('mouseenter', () => { this.retransBtn.style.opacity = '.7'; });
+    this.retransBtn.addEventListener('mouseleave', () => { this.retransBtn.style.opacity = '.4'; });
+    this.retransBtn.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      this.onRetranslate?.();
+    });
+    this.retransBtn.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        this.onRetranslate?.();
+      }
+    });
   }
+  /** Bind the re-translate action for this block (called once the owning paragraph is known). */
+  setRetranslateHandler(fn: () => void): void { this.onRetranslate = fn; }
+  showRetranslate(): void { this.retransBtn.style.display = 'inline'; }
+  hideRetranslate(): void { this.retransBtn.style.display = 'none'; }
   start() {
     this.errorEl.hidden = true;
     this.stopWaiting();
@@ -258,18 +292,23 @@ class BlockView implements View {
       this.waitFrame = (this.waitFrame + 1) % BlockView.SPINNER.length; // 10-frame loop
       this.textEl.textContent = 'Translating ' + BlockView.SPINNER[this.waitFrame];
     }, 80);
+    this.hideRetranslate();
   }
   setChunk(full: string) { this.stopWaiting(); this.textEl.textContent = stripTags(full); }
   done(full: string) {
     this.stopWaiting();
     const html = reconstruct(full, this.originals);
     this.textEl.innerHTML = html || stripTags(full); // fallback to plain text if reconstruction yields nothing
+    this.showRetranslate();
   }
   error(msg: string, _onRetry: () => void) {
     this.stopWaiting();
     this.textEl.textContent = '';
     this.errorEl.textContent = msg;
     this.errorEl.hidden = false;
+    // The re-translate button's visibility is left to the caller: on a first-translation error
+    // it stays hidden (nothing to re-do); on a re-translate error the caller re-shows it so the
+    // user can retry. Either way the button is not toggled here.
   }
   private stopWaiting(): void {
     if (this.waitTimer !== null) { window.clearInterval(this.waitTimer); this.waitTimer = null; }
@@ -406,6 +445,9 @@ async function main(): Promise<void> {
   interface ParaState {
     view: BlockView;
     translation: string;
+    // CT-016: the paragraph's skeleton (placeholder HTML) cached at first translation so a
+    // re-translate can rebuild the message array without re-extracting the (possibly mutated) DOM.
+    skeleton: string;
     status: 'loading' | 'shown' | 'hidden';
     // CT-013: nearest ancestor with -webkit-line-clamp that would clip the translation block,
     // plus its original inline value so we can restore it (re-set, or remove to re-enable a class rule).
@@ -483,12 +525,16 @@ async function main(): Promise<void> {
       st = {
         view: new BlockView(originals),
         translation: '',
+        skeleton,
         status: 'hidden',
         clampEl,
         clampOrigInline: clampEl ? clampEl.style.getPropertyValue('-webkit-line-clamp') : '',
       };
       paraState.set(el, st);
       el.appendChild(st.view.host);
+      // CT-016: wire the re-translate button to this paragraph's state once it's known.
+      const retrans = () => reFetchHover(el, st!);
+      st.view.setRetranslateHandler(retrans);
     }
     if (st.status === 'shown') { setClamp(st, false); st.view.host.style.display = 'none'; st.status = 'hidden'; return; }
     if (st.status === 'hidden' && st.translation) { setClamp(st, true); st.view.host.style.display = 'block'; st.status = 'shown'; return; }
@@ -511,6 +557,35 @@ async function main(): Promise<void> {
       onError: (msg) => {
         st.status = 'shown';
         st.view.error(msg, () => fetchHover(el, skeleton, st));
+      },
+    });
+  }
+
+  // CT-016: re-translate an already-translated paragraph on demand. Mirrors fetchHover but
+  // builds a re-translate request (a <user-instruction> re-translate </user-instruction> marker
+  // plus the same <translate> skeleton, appended to the committed prefix — DS-001 stays stable)
+  // and commits via commitRetranslate (appends user+assistant turns, updates lastUsage, does NOT
+  // clear pending). On error the old translation is cleared and the error is shown in place; the
+  // re-translate button stays visible so the user can retry. Bypasses the CT-015 same-language
+  // skip (explicit user intent).
+  function reFetchHover(el: Element, st: ParaState): void {
+    st.translation = '';
+    st.status = 'loading';
+    st.view.host.style.display = 'block';
+    setClamp(st, true);
+    st.view.start();
+    stream('translate', session.buildRetranslateRequest(st.skeleton), {
+      onChunk: (full) => st.view.setChunk(full),
+      onDone: (full, usage) => {
+        st.translation = full;
+        st.view.done(full);
+        st.status = 'shown';
+        session.commitRetranslate(full, usage);
+      },
+      onError: (msg) => {
+        st.status = 'shown';
+        st.view.error(msg, () => reFetchHover(el, st));
+        st.view.showRetranslate();
       },
     });
   }

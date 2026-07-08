@@ -26,6 +26,8 @@ export class Session {
   private lastUsage: Usage | null = null;
   /** The user message of the most recent in-flight request, awaiting commit. */
   private pendingUserContent: string | null = null;
+  /** The user message of the most recent in-flight re-translate request, awaiting commit (SES-006). */
+  private pendingRetranslateContent: string | null = null;
 
   constructor(
     private readonly targetLang: string,
@@ -39,6 +41,7 @@ export class Session {
     this.cumulativeUsage = { promptTokens: 0, completionTokens: 0 };
     this.lastUsage = null;
     this.pendingUserContent = null;
+    this.pendingRetranslateContent = null;
   }
 
   /** Add 理解-selected background (not translated, used for context). */
@@ -82,6 +85,30 @@ export class Session {
     this.pendingUserContent = null;
   }
 
+  /** Build a re-translate request (CT-016 / SES-006): append the paragraph to the end of the
+   *  message array with a `re-translate` <user-instruction> marker, keeping the committed
+   *  prefix stable (DS-001). Pending is NOT touched and the custom prompt is NOT folded in
+   *  (a re-translate is a correction within the current segment, where the custom prompt was
+   *  already folded into the segment's first user message). The returned user message is
+   *  stashed so commitRetranslate can append the exact same content. */
+  buildRetranslateRequest(text: string): ChatMessage[] {
+    const content = `<user-instruction>\nre-translate\n</user-instruction>\n<translate>\n${text}\n</translate>`;
+    this.pendingRetranslateContent = content;
+    return [this.systemMessage(), ...this.turns, { role: 'user', content }];
+  }
+
+  /** Commit a completed re-translate: append the user + assistant turns (preserving the prefix
+   *  for the next request), update the last-translation snapshot, and accumulate usage. Pending
+   *  is NOT cleared — a re-translate is a correction, not a consumption of buffered context. */
+  commitRetranslate(assistantText: string, usage: Usage): void {
+    if (this.pendingRetranslateContent == null) return;
+    this.turns.push({ role: 'user', content: this.pendingRetranslateContent });
+    this.turns.push({ role: 'assistant', content: assistantText });
+    this.pendingRetranslateContent = null;
+    this.lastUsage = { ...usage };
+    this.accumulateUsage(usage);
+  }
+
   /** Build a compress request: system + history + a user message asking for a summary. Pending is preserved. */
   buildCompressRequest(): ChatMessage[] {
     return [this.systemMessage(), ...this.turns, { role: 'user', content: COMPRESS_PROMPT }];
@@ -91,6 +118,7 @@ export class Session {
   commitCompress(summary: string, usage: Usage): void {
     this.turns = [{ role: 'assistant', content: summary }];
     this.pendingUserContent = null;
+    this.pendingRetranslateContent = null;
     this.accumulateUsage(usage);
   }
 
