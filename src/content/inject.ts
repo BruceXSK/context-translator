@@ -1,5 +1,5 @@
 // Content script: per-page session owner + hover/selection translation UI.
-// See design/content.md (CT-001 .. CT-011).
+// See design/content.md (CT-001 .. CT-018).
 import { loadSettings, type Settings } from '../config';
 import { Session } from '../session';
 import type { ChatMessage, RuntimeRequest, StreamEvent, Usage } from '../shared/messages';
@@ -44,6 +44,18 @@ const STYLE_TEXT = `
 .ct-retry{all:unset;font-family:var(--ct-sans);font-size:.8125rem;color:var(--ct-accent);cursor:pointer;
   border-bottom:1px solid currentColor;padding-bottom:1px;white-space:nowrap}
 .ct-retry:hover{color:var(--ct-ink)}
+.ct-instr{width:min(380px,86vw);background:var(--ct-paper);border:1px solid var(--ct-rule);
+  border-radius:var(--ct-panel-radius);box-shadow:var(--ct-shadow-panel);overflow:hidden;animation:ct-rise .16s ease-out}
+.ct-instr-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px 7px 13px;
+  background:var(--ct-paper-2);border-bottom:1px solid var(--ct-rule)}
+.ct-instr-body{padding:11px 13px 13px;display:flex;flex-direction:column;gap:9px}
+.ct-instr-area{font-family:var(--ct-sans);font-size:.9rem;line-height:1.5;color:var(--ct-ink);
+  background:#fff;border:1px solid var(--ct-rule);border-radius:6px;padding:8px 10px;
+  min-height:64px;resize:vertical;width:100%;box-sizing:border-box;outline:none}
+.ct-instr-area:focus{border-color:var(--ct-accent)}
+.ct-instr-submit{all:unset;font-family:var(--ct-sans);font-size:.82rem;font-weight:600;color:#fff;
+  background:var(--ct-accent);border-radius:6px;padding:7px 14px;cursor:pointer;align-self:flex-start}
+.ct-instr-submit:hover{filter:brightness(1.06)}
 @keyframes ct-rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @keyframes ct-blink{50%{opacity:0}}
 `;
@@ -83,6 +95,28 @@ function stream(kind: 'translate' | 'compress', messages: ChatMessage[], h: Hand
   });
   port.onDisconnect.addListener(() => { if (!settled) { settled = true; h.onError('与服务端的连接中断'); } });
   port.postMessage({ kind, requestId, messages });
+}
+
+// CT-018: serialize all translate/compress streams per page. At most one is in flight; a request
+// that arrives while another is running waits (the promise chain) for the prior to settle, then
+// builds its message array on the now-current session (so it sees the prior's committed turns) and
+// streams. With one in flight the single in-flight slot (pendingUserContent) can never be clobbered
+// — eliminating the "one request's user content committed with another's assistant response"
+// corruption. Fresh translation, re-translate (CT-016/SES-006), and compress share this single exit.
+let flight: Promise<void> = Promise.resolve();
+/** Run one build→stream→commit cycle, serialized. `build` runs when this request's turn comes. */
+function runFlight(kind: 'translate' | 'compress', build: () => ChatMessage[], h: Handlers): void {
+  flight = flight
+    .catch(() => {})
+    .then(() => new Promise<void>((resolve) => {
+      let messages: ChatMessage[];
+      try { messages = build(); } catch { resolve(); return; }
+      stream(kind, messages, {
+        onChunk: h.onChunk,
+        onDone: (full, usage) => { h.onDone(full, usage); resolve(); },
+        onError: (msg) => { h.onError(msg); resolve(); },
+      });
+    }));
 }
 
 // ---------- html skeletonization + reconstruction (CT-011) ----------
@@ -383,6 +417,71 @@ class PanelView implements View {
   }
 }
 
+// POP-002: the "Add instruction" input panel (no selection). Shadow-DOM, near the cursor; a
+// textarea + submit. Enter submits, Shift+Enter inserts a newline, Esc closes. On submit the
+// typed text is added to the page's pending context as an instruction (session.addInstruction →
+// SES-002 instruction kind), folded into the next translation's <user-instruction> block.
+class InstructionView {
+  readonly host: HTMLElement;
+  private area: HTMLTextAreaElement;
+  private onSubmit: ((text: string) => void) | null = null;
+  private confirmTimer: number | null = null;
+  constructor() {
+    this.host = document.createElement('context-translator-instruction');
+    this.host.style.cssText = 'all:initial;display:block;position:fixed;z-index:2147483647;box-sizing:border-box';
+    this.host.style.display = 'none';
+    const root = shadowOf(this.host);
+    root.innerHTML =
+      '<div class="ct-instr"><div class="ct-instr-head"><span class="ct-eyebrow">Add instruction</span>' +
+      '<button class="ct-close">✕</button></div><div class="ct-instr-body">' +
+      '<textarea class="ct-instr-area" rows="3" placeholder="补充术语/背景/语气（回车提交，Shift+回车换行）"></textarea>' +
+      '<button class="ct-instr-submit">加入上下文</button></div></div>';
+    this.area = root.querySelector<HTMLTextAreaElement>('textarea')!;
+    root.querySelector<HTMLElement>('.ct-close')!.addEventListener('click', () => this.hide());
+    root.querySelector<HTMLElement>('.ct-instr-submit')!.addEventListener('click', () => this.submit());
+    this.area.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); this.hide(); }
+    });
+  }
+  show(x: number, y: number, onSubmit: (text: string) => void): void {
+    if (this.confirmTimer !== null) { clearTimeout(this.confirmTimer); this.confirmTimer = null; }
+    this.onSubmit = onSubmit;
+    this.area.value = '';
+    this.area.disabled = false;
+    this.area.placeholder = '补充术语/背景/语气（回车提交，Shift+回车换行）';
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const w = Math.min(380, vw - 16);
+    const left = Math.max(8, Math.min(x, vw - w - 8));
+    const top = Math.max(8, Math.min(y, vh - 200));
+    this.host.style.left = `${left}px`;
+    this.host.style.top = `${top}px`;
+    this.host.style.display = 'block';
+    requestAnimationFrame(() => this.area.focus());
+  }
+  hide(): void {
+    if (this.confirmTimer !== null) { clearTimeout(this.confirmTimer); this.confirmTimer = null; }
+    this.host.style.display = 'none';
+    this.onSubmit = null;
+  }
+  private submit(): void {
+    const text = this.area.value.trim();
+    const cb = this.onSubmit;
+    if (text && cb) cb(text); // session.addInstruction — folded into the next fresh translation's <user-instruction> block
+    if (text) {
+      // Brief confirmation: the instruction is queued in the page's pending context and takes
+      // effect on the NEXT FRESH translation (a paragraph not yet translated, or a selection +
+      // trigger key) — not a cached toggle or a ↻ re-translate, which don't consume pending.
+      this.area.value = '';
+      this.area.disabled = true;
+      this.area.placeholder = '✓ 已加入上下文，下次翻译生效';
+      this.confirmTimer = window.setTimeout(() => { this.confirmTimer = null; this.hide(); }, 900);
+    } else {
+      this.hide();
+    }
+  }
+}
+
 // ---------- helpers ----------
 function isEditable(el: Element | null): boolean {
   if (!el) return false;
@@ -434,6 +533,22 @@ function selectionRect(): DOMRect | null {
   return null;
 }
 
+// CT-017: the active text selection for the trigger-key path. window.getSelection() misses
+// selections inside <input>/<textarea> (those don't go through the document selection), so fall
+// back to activeElement.selectionStart/End — otherwise dropping the right-click "翻译" menu item
+// (which got its text from Chrome's info.selectionText) would regress editable selections.
+function currentSelectionText(): string {
+  const sel = window.getSelection();
+  const docSel = sel ? sel.toString().trim() : '';
+  if (docSel) return docSel;
+  const el = document.activeElement;
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    const s = el.value.substring(el.selectionStart ?? 0, el.selectionEnd ?? 0).trim();
+    if (s) return s;
+  }
+  return '';
+}
+
 // ---------- main ----------
 async function main(): Promise<void> {
   const settings: Settings = await loadSettings();
@@ -441,6 +556,8 @@ async function main(): Promise<void> {
   const triggerKey = settings.triggerKey || 'Alt';
   const panel = new PanelView();
   (document.body || document.documentElement).appendChild(panel.host);
+  const instr = new InstructionView();
+  (document.body || document.documentElement).appendChild(instr.host);
 
   interface ParaState {
     view: BlockView;
@@ -460,6 +577,22 @@ async function main(): Promise<void> {
   let mx = -1;
   let my = -1;
   document.addEventListener('mousemove', (e) => { mx = e.clientX; my = e.clientY; }, { passive: true });
+
+  // BG-003: report empty↔non-empty selection transitions to the background so the single context-
+  // menu item's title tracks the selection ("Add to context" vs "Add instruction"). Debounced +
+  // deduped to transitions only — typing with a collapsed caret or nudging a selection does not
+  // wake the worker. The click action is decided in the background from info.selectionText, so a
+  // momentarily-stale title never causes a wrong action.
+  let selHas = false;
+  let selTimer: number | null = null;
+  document.addEventListener('selectionchange', () => {
+    if (selTimer !== null) clearTimeout(selTimer);
+    selTimer = window.setTimeout(() => {
+      selTimer = null;
+      const has = !!currentSelectionText();
+      if (has !== selHas) { selHas = has; chrome.runtime.sendMessage({ kind: 'selectionState', has }).catch(() => {}); }
+    }, 50);
+  });
 
   // tap-trigger semantics: trigger only on a solo tap of the trigger key (no other key/mouse/modifier)
   const TK = triggerKey.toLowerCase();
@@ -485,6 +618,12 @@ async function main(): Promise<void> {
   });
 
   function doToggle(): void {
+    // CT-017: an active text selection routes the trigger key to the selection panel (the former
+    // right-click 翻译, CT-005) instead of hover translation. Explicit user intent —
+    // selectionTranslate does not apply the CT-015 same-language skip. Covers document +
+    // input/textarea selections (currentSelectionText).
+    const selText = currentSelectionText();
+    if (selText) { selectionTranslate(selText); return; }
     if (mx < 0) return;
     const target = document.elementFromPoint(mx, my);
     if (!target || isEditable(target)) return;
@@ -538,6 +677,7 @@ async function main(): Promise<void> {
     }
     if (st.status === 'shown') { setClamp(st, false); st.view.host.style.display = 'none'; st.status = 'hidden'; return; }
     if (st.status === 'hidden' && st.translation) { setClamp(st, true); st.view.host.style.display = 'block'; st.status = 'shown'; return; }
+    if (st.status === 'loading') return; // CT-018: already in flight or queued — don't pile a duplicate
     fetchHover(el, skeleton, st);
   }
 
@@ -546,7 +686,7 @@ async function main(): Promise<void> {
     st.view.host.style.display = 'block';
     setClamp(st, true);
     st.view.start();
-    stream('translate', session.buildTranslateRequest(skeleton), {
+    runFlight('translate', () => session.buildTranslateRequest(skeleton), {
       onChunk: (full) => st.view.setChunk(full),
       onDone: (full, usage) => {
         st.translation = full;
@@ -561,26 +701,26 @@ async function main(): Promise<void> {
     });
   }
 
-  // CT-016: re-translate an already-translated paragraph on demand. Mirrors fetchHover but
-  // builds a re-translate request (a <user-instruction> re-translate </user-instruction> marker
-  // plus the same <translate> skeleton, appended to the committed prefix — DS-001 stays stable)
-  // and commits via commitRetranslate (appends user+assistant turns, updates lastUsage, does NOT
-  // clear pending). On error the old translation is cleared and the error is shown in place; the
-  // re-translate button stays visible so the user can retry. Bypasses the CT-015 same-language
-  // skip (explicit user intent).
+  // CT-016: re-translate an already-translated paragraph on demand. Now merged into the normal
+  // translate path (SES-006): buildTranslateRequest with a 're-translate' marker leading the
+  // <user-instruction> block — so pending context/instruction IS folded (a just-added instruction
+  // applies) and commitResponse consumes it. The marker signals a re-translation; the skeleton is
+  // the one cached at first translation (ParaState.skeleton) so a re-translate doesn't re-extract
+  // the (possibly mutated) DOM. Bypasses the CT-015 same-language skip (explicit user intent). On
+  // error the old translation is cleared and shown in place; the ↻ button stays for retry.
   function reFetchHover(el: Element, st: ParaState): void {
     st.translation = '';
     st.status = 'loading';
     st.view.host.style.display = 'block';
     setClamp(st, true);
     st.view.start();
-    stream('translate', session.buildRetranslateRequest(st.skeleton), {
+    runFlight('translate', () => session.buildTranslateRequest(st.skeleton, 're-translate'), {
       onChunk: (full) => st.view.setChunk(full),
       onDone: (full, usage) => {
         st.translation = full;
         st.view.done(full);
         st.status = 'shown';
-        session.commitRetranslate(full, usage);
+        session.commitResponse(full, usage);
       },
       onError: (msg) => {
         st.status = 'shown';
@@ -594,7 +734,7 @@ async function main(): Promise<void> {
     const rect = selectionRect();
     panel.start();
     panel.show(rect ? rect.left : mx, rect ? rect.bottom + 10 : my);
-    stream('translate', session.buildTranslateRequest(text), {
+    runFlight('translate', () => session.buildTranslateRequest(text), {
       onChunk: (full) => panel.setChunk(full),
       onDone: (full, usage) => { panel.done(full); session.commitResponse(full, usage); },
       onError: (msg) => panel.error(msg, () => selectionTranslate(text)),
@@ -604,7 +744,7 @@ async function main(): Promise<void> {
   function doCompress(sendResponse: (r: unknown) => void): void {
     panel.start();
     panel.show(mx < 0 ? window.innerWidth / 2 : mx, my < 0 ? 80 : my);
-    stream('compress', session.buildCompressRequest(), {
+    runFlight('compress', () => session.buildCompressRequest(), {
       onChunk: (full) => panel.setChunk(full),
       onDone: (full, usage) => { session.commitCompress(full, usage); panel.done(full); sendResponse({ kind: 'ok' }); },
       onError: (msg) => { panel.error(msg, () => doCompress(sendResponse)); sendResponse({ kind: 'error', message: msg }); },
@@ -615,10 +755,10 @@ async function main(): Promise<void> {
   chrome.runtime.onMessage.addListener((req: RuntimeRequest, _sender, sendResponse) => {
     if (req.kind === 'contextMenu') {
       if (req.action === 'understand') session.addContext(req.selection);
-      else if (req.action === 'translate') selectionTranslate(req.selection);
+      else if (req.action === 'addInstruction')
+        instr.show(mx < 0 ? window.innerWidth / 2 : mx, my < 0 ? 80 : my, (text) => session.addInstruction(text));
       return false;
     }
-    if (req.kind === 'addContext') { session.addInstruction(req.text); sendResponse({ kind: 'ok' }); return false; }
     if (req.kind === 'clear') { session.reset(); sendResponse({ kind: 'ok' }); return false; }
     if (req.kind === 'getUsage') { sendResponse({ kind: 'usage', usage: session.getUsage() }); return false; }
     if (req.kind === 'compress') { doCompress(sendResponse); return true; } // async response

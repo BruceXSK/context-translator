@@ -14,18 +14,41 @@ interface StreamRequestMessage {
   messages: ChatMessage[];
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({ id: 'translate', title: '翻译', contexts: ['selection'] });
-  chrome.contextMenus.create({ id: 'understand', title: '理解', contexts: ['selection'] });
+chrome.runtime.onInstalled.addListener(async () => {
+  // Context-dependent menu (BG-003): a SINGLE item whose title adapts to the selection state —
+  // "Add to context" when a selection exists, "Add instruction" when none — so exactly one item
+  // is ever visible (Chrome collapses 2+ extension items into an extension-name submenu; one
+  // stays flat at the top level). The menu offers no translate action; selection translation is
+  // via the trigger key (CT-017). removeAll first so a dev reload doesn't error on a duplicate id.
+  await chrome.contextMenus.removeAll();
+  chrome.contextMenus.create({ id: 'ctx', title: 'Add instruction', contexts: ['all'] });
+});
+
+// The content script reports selection-state transitions (selectionchange, debounced + deduped to
+// empty↔non-empty) so the single item's title tracks the selection. chrome.contextMenus has no
+// onShown/refresh event, so the title is updated here on each transition. The click ACTION is
+// decided from info.selectionText (ground truth at click time), not the title — a momentarily-
+// stale title never causes a wrong action.
+chrome.runtime.onMessage.addListener((req: RuntimeRequest, _sender, sendResponse) => {
+  if (req.kind === 'selectionState') {
+    void chrome.contextMenus.update('ctx', { title: req.has ? 'Add to context' : 'Add instruction' });
+  }
+  sendResponse(true);
+  return false;
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (!tab?.id || !info.selectionText) return;
-  const action = info.menuItemId === 'understand' ? 'understand' : 'translate';
-  const req: RuntimeRequest = { kind: 'contextMenu', action, selection: info.selectionText };
-  chrome.tabs.sendMessage(tab.id, req).catch(() => {
-    /* content script may be absent on chrome:// pages or before injection */
-  });
+  if (!tab?.id || info.menuItemId !== 'ctx') return;
+  const sel = info.selectionText ? info.selectionText.trim() : '';
+  if (sel) {
+    // right-clicked on a selection → Add to context (the former "理解", session.addContext)
+    const req: RuntimeRequest = { kind: 'contextMenu', action: 'understand', selection: sel };
+    chrome.tabs.sendMessage(tab.id, req).catch(() => { /* content may be absent */ });
+  } else {
+    // no selection → Add instruction (content shows the input panel, POP-002)
+    const req: RuntimeRequest = { kind: 'contextMenu', action: 'addInstruction' };
+    chrome.tabs.sendMessage(tab.id, req).catch(() => { /* content may be absent */ });
+  }
 });
 
 chrome.runtime.onConnect.addListener((port) => {

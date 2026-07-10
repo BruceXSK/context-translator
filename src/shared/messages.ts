@@ -30,13 +30,18 @@ export interface UsageSnapshot {
 // Runtime request messages (chrome.runtime / chrome.tabs messaging).
 // translate / compress: content -> background (carries the assembled messages array,
 // since the service worker is stateless and the content script owns the session).
-// contextMenu: background -> content (right-click "翻译" / "理解").
-// addContext / clear / getUsage: popup -> content.
+// contextMenu: background -> content — "understand" carries the selection (Add to context,
+// shown only when a selection exists); "addInstruction" asks the content script to show its
+// instruction input panel (Add instruction, shown only when no selection exists). See BG-003.
+// selectionState: content -> background — reports an empty↔non-empty selection transition so the
+// single menu item's title tracks the selection ("Add to context" vs "Add instruction"). See BG-003.
+// clear / getUsage: popup -> content.
 export type RuntimeRequest =
   | { kind: 'translate'; requestId: string; messages: ChatMessage[] }
   | { kind: 'compress'; requestId: string; messages: ChatMessage[] }
-  | { kind: 'contextMenu'; action: 'translate' | 'understand'; selection: string }
-  | { kind: 'addContext'; text: string }
+  | { kind: 'contextMenu'; action: 'understand'; selection: string }
+  | { kind: 'contextMenu'; action: 'addInstruction' }
+  | { kind: 'selectionState'; has: boolean }
   | { kind: 'clear' }
   | { kind: 'getUsage' };
 

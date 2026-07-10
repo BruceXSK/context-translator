@@ -24,10 +24,9 @@ export class Session {
   /** Snapshot of the most recent translation response's usage (for the popup's context
    *  gauge and Last cache rate, POP-003). Compress responses do NOT replace this. */
   private lastUsage: Usage | null = null;
-  /** The user message of the most recent in-flight request, awaiting commit. */
+  /** The user message of the most recent in-flight request, awaiting commit. With CT-018
+   *  serialization only one request is ever in flight, so this single slot cannot be clobbered. */
   private pendingUserContent: string | null = null;
-  /** The user message of the most recent in-flight re-translate request, awaiting commit (SES-006). */
-  private pendingRetranslateContent: string | null = null;
 
   constructor(
     private readonly targetLang: string,
@@ -41,7 +40,6 @@ export class Session {
     this.cumulativeUsage = { promptTokens: 0, completionTokens: 0 };
     this.lastUsage = null;
     this.pendingUserContent = null;
-    this.pendingRetranslateContent = null;
   }
 
   /** Add 理解-selected background (not translated, used for context). */
@@ -57,10 +55,12 @@ export class Session {
   /** Build the full message array for a translation request (pending folded, not yet committed).
    *  The custom prompt (CFG-005) is folded into the <user-instruction> block only on the first
    *  user message of a session-segment (no committed user turns yet — also re-added after a
-   *  compress or clear), so it appears once per segment rather than every turn. */
-  buildTranslateRequest(text: string): ChatMessage[] {
+   *  compress or clear), so it appears once per segment rather than every turn. `marker` (used by
+   *  re-translate, CT-016/SES-006) leads the <user-instruction> block as a re-translate signal; the
+   *  custom prompt is NOT re-folded for a re-translate (already in the segment's first user message). */
+  buildTranslateRequest(text: string, marker?: string): ChatMessage[] {
     const includeCustom = !this.turns.some((t) => t.role === 'user');
-    const userContent = this.foldPending(text, includeCustom);
+    const userContent = this.foldPending(text, includeCustom, marker);
     this.pendingUserContent = userContent;
     return [this.systemMessage(), ...this.turns, { role: 'user', content: userContent }];
   }
@@ -85,30 +85,6 @@ export class Session {
     this.pendingUserContent = null;
   }
 
-  /** Build a re-translate request (CT-016 / SES-006): append the paragraph to the end of the
-   *  message array with a `re-translate` <user-instruction> marker, keeping the committed
-   *  prefix stable (DS-001). Pending is NOT touched and the custom prompt is NOT folded in
-   *  (a re-translate is a correction within the current segment, where the custom prompt was
-   *  already folded into the segment's first user message). The returned user message is
-   *  stashed so commitRetranslate can append the exact same content. */
-  buildRetranslateRequest(text: string): ChatMessage[] {
-    const content = `<user-instruction>\nre-translate\n</user-instruction>\n<translate>\n${text}\n</translate>`;
-    this.pendingRetranslateContent = content;
-    return [this.systemMessage(), ...this.turns, { role: 'user', content }];
-  }
-
-  /** Commit a completed re-translate: append the user + assistant turns (preserving the prefix
-   *  for the next request), update the last-translation snapshot, and accumulate usage. Pending
-   *  is NOT cleared — a re-translate is a correction, not a consumption of buffered context. */
-  commitRetranslate(assistantText: string, usage: Usage): void {
-    if (this.pendingRetranslateContent == null) return;
-    this.turns.push({ role: 'user', content: this.pendingRetranslateContent });
-    this.turns.push({ role: 'assistant', content: assistantText });
-    this.pendingRetranslateContent = null;
-    this.lastUsage = { ...usage };
-    this.accumulateUsage(usage);
-  }
-
   /** Build a compress request: system + history + a user message asking for a summary. Pending is preserved. */
   buildCompressRequest(): ChatMessage[] {
     return [this.systemMessage(), ...this.turns, { role: 'user', content: COMPRESS_PROMPT }];
@@ -118,7 +94,6 @@ export class Session {
   commitCompress(summary: string, usage: Usage): void {
     this.turns = [{ role: 'assistant', content: summary }];
     this.pendingUserContent = null;
-    this.pendingRetranslateContent = null;
     this.accumulateUsage(usage);
   }
 
@@ -137,10 +112,13 @@ export class Session {
 
   /** Fold pending context into the translation user message with the XML tags (SES-002).
    *  When includeCustom is set (first user message of a segment), the page-snapshotted custom
-   *  prompt leads the <user-instruction> block — reusing the existing tag, not a new one (CFG-005). */
-  private foldPending(text: string, includeCustom: boolean): string {
+   *  prompt leads the <user-instruction> block — reusing the existing tag, not a new one (CFG-005).
+   *  `marker` (re-translate, CT-016/SES-006) is prepended to the <user-instruction> block so the
+   *  block is always present for a re-translate even with no pending instruction. */
+  private foldPending(text: string, includeCustom: boolean, marker?: string): string {
     const contextText = this.pending.filter((p) => p.kind === 'context').map((p) => p.text).join('\n\n');
     const instrParts: string[] = [];
+    if (marker) instrParts.push(marker);
     if (includeCustom && this.customPrompt.trim()) instrParts.push(this.customPrompt.trim());
     for (const p of this.pending) if (p.kind === 'instruction') instrParts.push(p.text);
     const instructionText = instrParts.join('\n\n');
