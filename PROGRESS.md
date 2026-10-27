@@ -2,7 +2,9 @@
 
 ## Current State
 
-**复杂行内节点与段落预算修复（CT-011 modify，test/typecheck/build 通过；Chrome 实机复测待扩展 reload）：** PyTorch `torch.nn.functional.pad` 的 Padding size 段落暴露两个问题：`.notranslate` 行内代码被整节点删除，且原始 HTML 骨架按 3000 字符硬切导致后半段丢失。新增 `src/content/skeleton.ts`：`code`/`kbd`/`samp`/`var` 与 KaTeX/MathJax/`.notranslate` 作为原子节点，公式使用 `[[CT-ATOM-n]]` 占位；预算按可翻译文本计算并在文本节点边界截断；返回后校验每个 `data-ct-id` 恰好出现一次，缺失/重复时原位提示重试且不提交 session。真实 PyTorch 段落实测：可翻译字符 268、骨架 747 字符、7 个公式原子、`input`/`pad` 与最后 3 维说明均保留。新增 3 个 `linkedom` 回归测试；`npm test`、`npm run typecheck`、`npm run build` 通过。当前已运行的 Chrome 持有旧 dist 哈希，需在 `chrome://extensions` 重新加载扩展后做最终页面复测。
+**v0.1.6 已发布**（Release workflow 成功、zip 与包内 manifest 版本已核验、手写 changelog，见 https://github.com/BruceXSK/context-translator/releases/tag/v0.1.6）。
+
+**复杂行内节点与段落预算修复（CT-011 modify，test/typecheck/build/Chrome 验证通过 → DONE）：** PyTorch `torch.nn.functional.pad` 的 Padding size 段落暴露两个问题：`.notranslate` 行内代码被整节点删除，且原始 HTML 骨架按 3000 字符硬切导致后半段丢失。新增 `src/content/skeleton.ts`：`code`/`kbd`/`samp`/`var` 与 KaTeX/MathJax/`.notranslate` 作为原子节点，公式使用 `[[CT-ATOM-n]]` 占位；预算按可翻译文本计算并在文本节点边界截断；返回后校验每个 `data-ct-id` 恰好出现一次，缺失/重复时原位提示重试且不提交 session。真实 PyTorch 段落实测：可翻译字符 268、骨架 747 字符、7 个公式原子、`input`/`pad` 与最后 3 维说明均保留。新增 3 个 `linkedom` 回归测试；`npm test`、`npm run typecheck`、`npm run build` 通过。
 
 **v0.1.5 已发布**（CI 绿、手写 changelog，见 https://github.com/BruceXSK/context-translator/releases/tag/v0.1.5）。
 
@@ -14,6 +16,7 @@ v1 核心已验证通过：悬停翻译 + 划线翻译在 Chrome 中正常工作
 
 ## Completed
 
+- (release) v0.1.6 发布：bump 版本 0.1.5→0.1.6（`manifest.config.ts` + `package.json`，沿用惯例不动 `package-lock.json`），push `v0.1.6` tag 触发 release.yml；workflow `40465353947` 成功，`npm ci` / build / 版本三连校验 / 打包 / softprops 发 release 全部通过；`context-translator-0.1.6.zip` 已发布，包内顶层目录与 `manifest.json` 版本均为 0.1.6；release body 用 `gh release edit --notes` 手写 changelog。见 https://github.com/BruceXSK/context-translator/releases/tag/v0.1.6。
 - (content+tests+docs) 复杂行内节点与段落预算修复（CT-011 modify，test/typecheck/build 通过）：新增 `src/content/skeleton.ts`，把 `.notranslate`、code 类行内节点和 KaTeX/MathJax 公式容器收敛为原子骨架；代码保留可见文本，公式使用 `[[CT-ATOM-n]]`，还原时克隆并清理原 DOM。预算改为统计可翻译文本并在文本节点边界截断，不再对序列化 HTML 做 `slice`。`inject.ts` 增加 `data-ct-id` 完整性校验，缺失/重复时显示可重试错误并 `abortRequest()`，避免把不完整结果提交进 session。system prompt 增加原子标记保持规则。新增 `test/skeleton.test.mjs` 覆盖 PyTorch 段落、缺 ID 拒绝、长段落边界预算；`README` 增加 `npm test`。真实 PyTorch 段落验证：`input`/`pad`、公式和最后 3 维说明均保留，骨架由约 6297 字符降至 747 字符。
 - (release) v0.1.5 发布：bump 版本 0.1.4→0.1.5（`manifest.config.ts`+`package.json`，不动 `package-lock.json`），push `v0.1.5` tag 触发 release.yml，CI 绿（npm ci/build/版本三连校验/打包/softprops 发 release 全过），`context-translator-0.1.5.zip` 已发布；release body 用 `gh release edit --notes` 手写 changelog（上下文相关右键菜单 + 触发键选区翻译 + Add instruction + 串行单飞 + 重翻译并入普通路径 + README 配置漂移修复）。含 feat 88ec3c2（菜单/触发键/串行/重翻译并入）+ docs 4390994（README 漂移）。见 https://github.com/BruceXSK/context-translator/releases/tag/v0.1.5。
 - (content+session+shared) 串行化 + 重翻译并入普通翻译路径（CT-018 add / SES-006 modify / CT-016 modify，typecheck/build 绿、Chrome 验证通过 → DONE）：inject 加 `runFlight` 串行门控（每页单飞：在途时后续请求经 Promise 链死等前一个 settle，再基于已更新 session 调 build 构建消息后 stream），fetchHover/selectionTranslate/reFetchHover/doCompress 全走 runFlight；消除并发污染（一个请求的 user 内容被另一请求的 assistant 回复提交）。重翻译并入普通翻译路径：`buildTranslateRequest(skeleton,'re-translate')`（marker 置于 `<user-instruction>` 块开头、折入 pending）+ `commitResponse`（消费 pending），删 `buildRetranslateRequest`/`commitRetranslate`/`pendingRetranslateContent` 独立槽，仅一个翻译出口。session：`buildTranslateRequest` 加 `marker?` 参数、`foldPending` 前置 marker；删 retranslate 方法与字段（reset/commitCompress 同步去引用）。toggleHover 对 loading 态重触发改 no-op。CT-018/SES-006/CT-016 → DONE（Chrome 验证通过）。
@@ -53,7 +56,7 @@ v1 核心已验证通过：悬停翻译 + 划线翻译在 Chrome 中正常工作
 
 ## Unresolved Problems
 
-- CT-011 Chrome 实机复测待完成：当前运行中的扩展仍加载旧 `dist` 哈希，页面重载后报旧的 `inject.ts-*.js` 不可用；代码、回归测试、类型检查和构建均已通过，需在 `chrome://extensions` 重新加载扩展后再验证 PyTorch 页面。
+- 无。
 
 ## Spec Changes
 
