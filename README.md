@@ -113,6 +113,7 @@ npm run build
 
 - `npm run dev`：启动 Vite 开发模式（加载 `dist` 后支持热更新）。
 - `npm run typecheck`：TypeScript 类型检查。
+- `npm test`：运行 content script 骨架抽取与占位符校验回归测试。
 - `npm run build`：生产构建到 `dist/`。
 
 ## 隐私与备注

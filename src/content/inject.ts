@@ -3,10 +3,15 @@
 import { loadSettings, type Settings } from '../config';
 import { Session } from '../session';
 import type { ChatMessage, RuntimeRequest, StreamEvent, Usage } from '../shared/messages';
+import {
+  extractSkeleton,
+  isAtomicElement,
+  validatePlaceholderIds,
+  type PlaceholderValidation,
+} from './skeleton';
 import DOMPurify from 'dompurify';
 
 const PORT_NAME = 'llm-stream';
-const MAX_PARA_CHARS = 3000;
 const BLOCK_TAGS = new Set([
   'P', 'LI', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
   'TD', 'TH', 'DT', 'DD', 'FIGCAPTION', 'SUMMARY', 'PRE',
@@ -119,13 +124,16 @@ function runFlight(kind: 'translate' | 'compress', build: () => ChatMessage[], h
     }));
 }
 
-// ---------- html skeletonization + reconstruction (CT-011) ----------
-// Inline elements are replaced with <x data-ct-id data-ct-tag> placeholders so the LLM only
-// sees text + minimal markers (no original attributes are sent). On return, each <x> is swapped
-// back for a clone of its original element (event handlers / dangerous URIs stripped) with
-// translated children — so links/code keep the page's styling and attributes (CT-010).
+// ---------- html reconstruction (CT-011) ----------
+// skeleton.ts sends compact data-ct-id placeholders without original attributes. Atomic code and
+// formula nodes are restored from sanitized originals; normal inline nodes receive translated
+// children so links/text keep the page's styling and attributes (CT-010).
 function stripTags(s: string): string {
-  return s.replace(/<\/?[a-zA-Z][^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return s
+    .replace(/\[\[CT-ATOM-[^\]]*\]{0,2}/g, '…')
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // CT-015: skip hover translation when the paragraph is already in the target language.
@@ -173,52 +181,41 @@ function countScripts(s: string): { han: number; kana: number; hangul: number; l
   return c;
 }
 
-/** Replace each element under `root` with an <x data-ct-id data-ct-tag> placeholder (nested for
- *  nested elements), storing a shallow clone (tag + attributes) of each original by id. */
-function extractSkeleton(root: Element): { skeleton: string; originals: Map<number, Element> } {
-  const clone = root.cloneNode(true) as Element;
-  clone.querySelectorAll('context-translator-block, .notranslate').forEach((n) => n.remove());
-  const originals = new Map<number, Element>();
-  const counter = { n: 0 };
-  const frag = document.createDocumentFragment();
-  for (const child of Array.from(clone.childNodes)) frag.appendChild(toSkeleton(child, originals, counter));
-  const wrap = document.createElement('div');
-  wrap.appendChild(frag);
-  return { skeleton: wrap.innerHTML.slice(0, MAX_PARA_CHARS), originals };
-}
-
-function toSkeleton(node: Node, originals: Map<number, Element>, counter: { n: number }): Node {
-  if (node.nodeType === Node.TEXT_NODE) return node.cloneNode(false);
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const el = node as Element;
-    const id = ++counter.n;
-    originals.set(id, el.cloneNode(false) as Element); // tag + attributes; children replaced on reconstruct
-    // Placeholder keeps the REAL tag (so the LLM treats it semantically — e.g. keeps a link's
-    // text together and moves it as a unit) but carries only a data-ct-id; no original
-    // attributes (href/class/data-*/style/…) are sent to the LLM (CT-011).
-    const ph = document.createElement(el.tagName);
-    ph.setAttribute('data-ct-id', String(id));
-    for (const c of Array.from(el.childNodes)) ph.appendChild(toSkeleton(c, originals, counter));
-    return ph;
-  }
-  return document.createTextNode(''); // drop comments / processing instructions
-}
-
 /** Sanitize the LLM's returned HTML to safe inline tags carrying data-ct-id + text (scripts,
  *  handlers, style, etc. stripped), then swap each tagged element back for a clone of its
  *  original element with recursively reconstructed children. */
-function reconstruct(dirty: string, originals: Map<number, Element>): string {
+interface ReconstructionResult {
+  html: string;
+  validation: PlaceholderValidation;
+}
+
+const FORBIDDEN_TAGS = [
+  'script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta',
+  'base', 'frame', 'frameset', 'applet', 'marquee', 'svg', 'math', 'noscript', 'template',
+  'title', 'textarea', 'select', 'option',
+];
+
+// Atomic nodes come from the host page, not the model. Preserve MathML/SVG formula markup,
+// but still remove active elements and event/URI attributes from the cloned subtree.
+const UNSAFE_ATOMIC_SELECTOR = [
+  'script', 'style', 'iframe', 'object', 'embed', 'foreignObject', 'link', 'meta', 'base',
+  'form', 'input', 'button', 'select', 'textarea', 'option', 'frame', 'frameset', 'applet',
+  'marquee', 'noscript', 'template', 'title',
+].join(',');
+
+function reconstruct(dirty: string, originals: Map<number, Element>): ReconstructionResult {
   const clean = DOMPurify.sanitize(dirty, {
-    FORBID_TAGS: ['script','style','iframe','object','embed','form','input','button','link','meta','base','frame','frameset','applet','marquee','svg','math','noscript','template','title','textarea','select','option'],
+    FORBID_TAGS: FORBIDDEN_TAGS,
     ALLOW_DATA_ATTR: true,
   });
   const wrap = document.createElement('div');
   wrap.innerHTML = clean;
+  const validation = validatePlaceholderIds(wrap, originals);
   const out = document.createDocumentFragment();
   for (const child of Array.from(wrap.childNodes)) out.appendChild(reconstructNode(child, originals));
   const result = document.createElement('div');
   result.appendChild(out);
-  return result.innerHTML;
+  return { html: result.innerHTML, validation };
 }
 
 function reconstructNode(node: Node, originals: Map<number, Element>): Node {
@@ -227,6 +224,11 @@ function reconstructNode(node: Node, originals: Map<number, Element>): Node {
     const el = node as Element;
     const original = originals.get(Number(el.getAttribute('data-ct-id')));
     if (original) {
+      if (isAtomicElement(original)) {
+        const clone = original.cloneNode(true) as Element;
+        sanitizeTree(clone);
+        return clone;
+      }
       const clone = original.cloneNode(false) as Element;
       sanitizeClone(clone);
       for (const c of Array.from(el.childNodes)) clone.appendChild(reconstructNode(c, originals));
@@ -235,6 +237,12 @@ function reconstructNode(node: Node, originals: Map<number, Element>): Node {
     return document.createTextNode(el.textContent ?? ''); // no/unknown id → plain text fallback
   }
   return document.createTextNode('');
+}
+
+function sanitizeTree(root: Element): void {
+  root.querySelectorAll(UNSAFE_ATOMIC_SELECTOR).forEach((el) => el.remove());
+  sanitizeClone(root);
+  root.querySelectorAll('*').forEach((el) => sanitizeClone(el));
 }
 
 /** Strip event-handler attributes and dangerous URI schemes from a reused original element. */
@@ -255,7 +263,7 @@ function sanitizeClone(el: Element): void {
 interface View {
   start(): void;
   setChunk(full: string): void;
-  done(full: string): void;
+  done(full: string): boolean;
   error(msg: string, onRetry: () => void): void;
 }
 
@@ -329,11 +337,16 @@ class BlockView implements View {
     this.hideRetranslate();
   }
   setChunk(full: string) { this.stopWaiting(); this.textEl.textContent = stripTags(full); }
-  done(full: string) {
+  done(full: string): boolean {
     this.stopWaiting();
-    const html = reconstruct(full, this.originals);
-    this.textEl.innerHTML = html || stripTags(full); // fallback to plain text if reconstruction yields nothing
+    const { html, validation } = reconstruct(full, this.originals);
+    this.textEl.innerHTML = html || stripTags(full);
     this.showRetranslate();
+    this.errorEl.hidden = validation.complete;
+    if (!validation.complete) {
+      this.errorEl.textContent = '译文缺少部分不可翻译内容，请点击重新翻译重试。';
+    }
+    return validation.complete;
   }
   error(msg: string, _onRetry: () => void) {
     this.stopWaiting();
@@ -386,7 +399,11 @@ class PanelView implements View {
   hide(): void { this.host.style.display = 'none'; }
   start() { this.textEl.textContent = ''; this.textEl.classList.add('ct-streaming'); this.errorEl.hidden = true; this.host.style.display = 'block'; }
   setChunk(full: string) { this.textEl.textContent = full; }
-  done(full: string) { this.textEl.textContent = full; this.textEl.classList.remove('ct-streaming'); }
+  done(full: string): boolean {
+    this.textEl.textContent = full;
+    this.textEl.classList.remove('ct-streaming');
+    return true;
+  }
   error(msg: string, onRetry: () => void) {
     this.textEl.classList.remove('ct-streaming');
     this.errMsg.textContent = msg;
@@ -689,9 +706,13 @@ async function main(): Promise<void> {
     runFlight('translate', () => session.buildTranslateRequest(skeleton), {
       onChunk: (full) => st.view.setChunk(full),
       onDone: (full, usage) => {
-        st.translation = full;
-        st.view.done(full);
+        const complete = st.view.done(full);
         st.status = 'shown';
+        if (!complete) {
+          session.abortRequest();
+          return;
+        }
+        st.translation = full;
         session.commitResponse(full, usage);
       },
       onError: (msg) => {
@@ -717,9 +738,13 @@ async function main(): Promise<void> {
     runFlight('translate', () => session.buildTranslateRequest(st.skeleton, 're-translate'), {
       onChunk: (full) => st.view.setChunk(full),
       onDone: (full, usage) => {
-        st.translation = full;
-        st.view.done(full);
+        const complete = st.view.done(full);
         st.status = 'shown';
+        if (!complete) {
+          session.abortRequest();
+          return;
+        }
+        st.translation = full;
         session.commitResponse(full, usage);
       },
       onError: (msg) => {
